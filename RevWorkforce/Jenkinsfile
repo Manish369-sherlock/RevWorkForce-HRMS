@@ -1,0 +1,70 @@
+pipeline {
+    agent any
+
+    tools {
+        jdk "JDK17"
+        maven "Maven3"
+    }
+
+    options {
+        skipStagesAfterUnstable()
+    }
+
+    environment {
+        JAR_NAME = "Workforce-0.0.1-SNAPSHOT.jar"
+        REMOTE_DIR = "/home/ec2-user"
+        APP_PORT = "8080"
+    }
+
+    stages {
+
+        stage("Checkout") {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage("Build") {
+            steps {
+                sh 'mvn -B clean compile'
+            }
+        }
+
+        stage("Test") {
+            steps {
+                sh 'mvn -B test'
+            }
+        }
+
+        stage("Package") {
+            steps {
+                sh 'mvn -B package -DskipTests'
+            }
+        }
+
+        stage("Deploy to EC2") {
+            steps {
+                sshPublisher(
+                    publishers: [
+                        sshPublisherDesc(
+                            configName: "ec2-server",
+                            verbose: true,
+                            transfers: [
+                                sshTransfer(
+                                    sourceFiles: "target/${JAR_NAME}",
+                                    removePrefix: "target/",
+                                    remoteDirectory: "${REMOTE_DIR}",
+                                    flatten: true,
+                                    execCommand: """
+                                        pkill -f "java -jar" || true
+                                        nohup java -jar *.jar --server.port=${APP_PORT} > application.log 2>&1 &
+                                    """
+                                )
+                            ]
+                        )
+                    ]
+                )
+            }
+        }
+    }
+}

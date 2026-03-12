@@ -4,6 +4,7 @@ pipeline {
     tools {
         jdk "JDK17"
         maven "Maven3"
+        nodejs "Node18"
     }
 
     options {
@@ -24,25 +25,26 @@ pipeline {
             }
         }
 
-        stage("Build") {
+        stage("Build Backend") {
             steps {
-                sh 'mvn -B clean compile'
+                dir("RevWorkforce") {
+                    sh "mvn clean package -DskipTests"
+                }
             }
         }
 
-        stage("Test") {
+        stage("Build Frontend") {
             steps {
-                sh 'mvn -B test'
+                dir("RevWorkForce-Frontend") {
+                    sh """
+                    npm install
+                    npm run build
+                    """
+                }
             }
         }
 
-        stage("Package") {
-            steps {
-                sh 'mvn -B package -DskipTests'
-            }
-        }
-
-        stage("Deploy to EC2") {
+        stage("Deploy Backend to EC2") {
             steps {
                 sshPublisher(
                     publishers: [
@@ -51,8 +53,8 @@ pipeline {
                             verbose: true,
                             transfers: [
                                 sshTransfer(
-                                    sourceFiles: "target/${JAR_NAME}",
-                                    removePrefix: "target/",
+                                    sourceFiles: "RevWorkforce/target/${JAR_NAME}",
+                                    removePrefix: "RevWorkforce/target/",
                                     remoteDirectory: "${REMOTE_DIR}",
                                     flatten: true,
                                     execCommand: """

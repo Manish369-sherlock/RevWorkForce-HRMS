@@ -52,21 +52,40 @@ pipeline {
             }
         }
 
-        stage("Deployment Stage") {
+        stage("Deploy Backend to EC2") {
             steps {
-                echo "Build completed successfully"
-                echo "Backend JAR created in RevWorkforce/target"
-                echo "Frontend build created in RevWorkForce-Frontend/dist"
+                sshPublisher(
+                    publishers: [
+                        sshPublisherDesc(
+                            configName: "ec2-server",
+                            transfers: [
+                                sshTransfer(
+                                    sourceFiles: "RevWorkforce/target/${JAR_NAME}",
+                                    removePrefix: "RevWorkforce/target/",
+                                    remoteDirectory: "",
+                                    execCommand: """
+                                        pkill -f Workforce || true
+                                        nohup java -jar ${JAR_NAME} > app.log 2>&1 &
+                                    """
+                                )
+                            ]
+                        )
+                    ]
+                )
             }
         }
+
     }
 
     post {
+
         success {
             echo "Pipeline executed successfully"
         }
+
         failure {
-            echo "Pipeline failed. Check console output."
+            echo "Pipeline failed. Check Jenkins logs."
         }
+
     }
 }

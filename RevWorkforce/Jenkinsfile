@@ -1,91 +1,98 @@
 pipeline {
-    agent any
+agent any
 
-    tools {
-        jdk "JDK17"
-        maven "Maven3"
-        nodejs "Node18"
-    }
-
-    environment {
-        JAR_NAME = "Workforce-0.0.1-SNAPSHOT.jar"
-    }
-
-    stages {
-
-        stage("Checkout Code") {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage("Build Backend (Spring Boot)") {
-            steps {
-                dir("RevWorkforce") {
-                    bat "mvn clean package -DskipTests"
-                }
-            }
-        }
-
-        stage("Verify Backend Build") {
-            steps {
-                dir("RevWorkforce") {
-                    bat "dir target"
-                }
-            }
-        }
-
-        stage("Build Frontend (Angular)") {
-            steps {
-                dir("RevWorkForce-Frontend") {
-                    bat "npm install"
-                    bat "npm run build"
-                }
-            }
-        }
-
-        stage("Verify Frontend Build") {
-            steps {
-                dir("RevWorkForce-Frontend") {
-                    bat "dir dist"
-                }
-            }
-        }
-
-        stage("Deploy Backend to EC2") {
-    steps {
-        sshPublisher(
-            publishers: [
-                sshPublisherDesc(
-                    configName: "ec2-server",
-                    transfers: [
-                        sshTransfer(
-                            sourceFiles: "RevWorkforce/target/Workforce-0.0.1-SNAPSHOT.jar",
-                            removePrefix: "RevWorkforce/target",
-                            remoteDirectory: "",
-                            execCommand: """
-                            pkill -f Workforce || true
-                            nohup java -jar Workforce-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
-                            """
-                        )
-                    ]
-                )
-            ]
-        )
-    }
+```
+tools {
+    jdk "JDK17"
+    maven "Maven3"
+    nodejs "Node18"
 }
 
+environment {
+    JAR_NAME = "Workforce-0.0.1-SNAPSHOT.jar"
+}
+
+stages {
+
+    stage("Checkout Code") {
+        steps {
+            checkout scm
+        }
     }
 
-    post {
-
-        success {
-            echo "Pipeline executed successfully"
+    stage("Build Backend (Spring Boot)") {
+        steps {
+            dir("RevWorkforce") {
+                bat "mvn clean package -DskipTests"
+            }
         }
-
-        failure {
-            echo "Pipeline failed. Check Jenkins logs."
-        }
-
     }
+
+    stage("Verify Backend Build") {
+        steps {
+            dir("RevWorkforce") {
+                bat "dir target"
+            }
+        }
+    }
+
+    stage("Build Frontend (Angular)") {
+        steps {
+            dir("RevWorkForce-Frontend") {
+                bat "npm install"
+                bat "npm run build"
+            }
+        }
+    }
+
+    stage("Verify Frontend Build") {
+        steps {
+            dir("RevWorkForce-Frontend") {
+                bat "dir dist"
+            }
+        }
+    }
+
+    stage("Deploy Backend to EC2") {
+        steps {
+            sshPublisher(
+                publishers: [
+                    sshPublisherDesc(
+                        configName: "ec2-server",
+                        verbose: true,
+                        transfers: [
+                            sshTransfer(
+                                sourceFiles: "RevWorkforce/target/${JAR_NAME}",
+                                removePrefix: "RevWorkforce/target",
+                                remoteDirectory: "",
+                                execCommand: """
+                                echo "Stopping previous application"
+                                pkill -f ${JAR_NAME} || true
+
+                                echo "Starting Spring Boot application"
+                                nohup java -jar ${JAR_NAME} > app.log 2>&1 &
+                                """
+                            )
+                        ]
+                    )
+                ]
+            )
+        }
+    }
+
+}
+
+post {
+
+    success {
+        echo "Pipeline executed successfully"
+    }
+
+    failure {
+        echo "Pipeline failed. Check Jenkins logs."
+    }
+
+}
+```
+
 }

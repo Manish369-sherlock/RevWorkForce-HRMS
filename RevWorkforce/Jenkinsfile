@@ -1,98 +1,122 @@
 pipeline {
-agent any
+    agent any
 
-tools {
-    jdk "JDK17"
-    maven "Maven3"
-    nodejs "Node18"
-}
-
-environment {
-    JAR_NAME = "Workforce-0.0.1-SNAPSHOT.jar"
-}
-
-stages {
-
-    stage("Checkout Code") {
-        steps {
-            checkout scm
-        }
+    tools {
+        jdk "JDK17"
+        maven "Maven3"
+        nodejs "Node18"
     }
 
-    stage("Build Backend (Spring Boot)") {
-        steps {
-            dir("RevWorkforce") {
-                bat "mvn clean package -DskipTests"
+    environment {
+        JAR_NAME = "Workforce-0.0.1-SNAPSHOT.jar"
+        REMOTE_DIR = "/home/ec2-user"
+    }
+
+    stages {
+
+        stage("Checkout Code") {
+            steps {
+                echo "Cloning repository from GitHub"
+                checkout scm
             }
         }
-    }
 
-    stage("Verify Backend Build") {
-        steps {
-            dir("RevWorkforce") {
-                bat "dir target"
+        stage("Build Backend (Spring Boot)") {
+            steps {
+                dir("RevWorkforce") {
+                    echo "Building Spring Boot backend"
+                    bat "mvn clean package -DskipTests"
+                }
             }
         }
-    }
 
-    stage("Build Frontend (Angular)") {
-        steps {
-            dir("RevWorkForce-Frontend") {
-                bat "npm install"
-                bat "npm run build"
+        stage("Verify Backend Build") {
+            steps {
+                dir("RevWorkforce") {
+                    echo "Verifying backend JAR"
+                    bat "dir target"
+                }
             }
         }
-    }
 
-    stage("Verify Frontend Build") {
-        steps {
-            dir("RevWorkForce-Frontend") {
-                bat "dir dist"
+        stage("Build Frontend (Angular)") {
+            steps {
+                dir("RevWorkForce-Frontend") {
+                    echo "Installing frontend dependencies"
+                    bat "npm install"
+
+                    echo "Building Angular application"
+                    bat "npm run build"
+                }
             }
         }
-    }
 
-    stage("Deploy Backend to EC2") {
-    steps {
-        sshPublisher(
-            publishers: [
-                sshPublisherDesc(
-                    configName: "ec2-server",
-                    transfers: [
-                        sshTransfer(
-                            sourceFiles: "RevWorkforce/target/Workforce-0.0.1-SNAPSHOT.jar",
-                            removePrefix: "RevWorkforce/target",
-                            remoteDirectory: "",
-                            execCommand: """
-                            echo "Stopping previous application"
-                            pkill -f Workforce-0.0.1-SNAPSHOT.jar || true
+        stage("Verify Frontend Build") {
+            steps {
+                dir("RevWorkForce-Frontend") {
+                    echo "Checking Angular dist folder"
+                    bat "dir dist"
+                }
+            }
+        }
 
-                            echo "Starting Spring Boot application"
-                            nohup java -jar Workforce-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
+        stage("Deploy Backend to EC2") {
+            steps {
+                echo "Deploying backend to EC2 instance"
 
-                            sleep 5
-                            echo "Application deployed successfully"
-                            """
+                sshPublisher(
+                    publishers: [
+                        sshPublisherDesc(
+                            configName: "ec2-server",
+
+                            transfers: [
+                                sshTransfer(
+                                    sourceFiles: "RevWorkforce/target/${JAR_NAME}",
+                                    removePrefix: "RevWorkforce/target",
+                                    remoteDirectory: "${REMOTE_DIR}",
+
+                                    execCommand: """
+                                    echo "===== Starting Deployment ====="
+
+                                    echo "Stopping previous Spring Boot application"
+                                    pkill -f ${JAR_NAME} || true
+
+                                    echo "Waiting for process to stop..."
+                                    sleep 3
+
+                                    echo "Starting new Spring Boot application"
+                                    nohup java -jar ${REMOTE_DIR}/${JAR_NAME} > ${REMOTE_DIR}/app.log 2>&1 &
+
+                                    echo "Waiting for application startup..."
+                                    sleep 8
+
+                                    echo "Checking running Java processes"
+                                    ps -ef | grep java
+
+                                    echo "===== Deployment Completed ====="
+                                    """
+                                )
+                            ]
                         )
                     ]
                 )
-            ]
-        )
-    }
-}
-
-}
-
-post {
-
-    success {
-        echo "Pipeline executed successfully"
+            }
+        }
     }
 
-    failure {
-        echo "Pipeline failed. Check Jenkins logs."
+    post {
+
+        success {
+            echo "Pipeline executed successfully"
+            echo "Application deployed to EC2"
+        }
+
+        failure {
+            echo "Pipeline failed. Check Jenkins console logs."
+        }
+
+        unstable {
+            echo "Pipeline finished but deployment may need verification."
+        }
     }
-
-}
-
 }

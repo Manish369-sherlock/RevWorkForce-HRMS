@@ -75,26 +75,27 @@ pipeline {
                                     removePrefix: "RevWorkforce/target",
                                     remoteDirectory: "${REMOTE_DIR}",
 
-                                    execCommand: """
+                                    execCommand: '''
                                     echo "===== Starting Deployment ====="
-
-                                    echo "Stopping previous Spring Boot application"
-                                    pkill -f ${JAR_NAME} || true
-
-                                    echo "Waiting for process to stop..."
-                                    sleep 3
-
-                                    echo "Starting new Spring Boot application"
-                                    nohup java -jar ${REMOTE_DIR}/${JAR_NAME} > ${REMOTE_DIR}/app.log 2>&1 &
-
-                                    echo "Waiting for application startup..."
-                                    sleep 8
-
-                                    echo "Checking running Java processes"
-                                    ps -ef | grep java
-
+                                    
+                                    echo "Stopping previous app..."
+                                    pkill -f Workforce-0.0.1-SNAPSHOT.jar || true
+                                    
+                                    sleep 5
+                                    
+                                    echo "Starting new app..."
+                                    nohup java -jar /home/ec2-user/Workforce-0.0.1-SNAPSHOT.jar > /home/ec2-user/app.log 2>&1 &
+                                    
+                                    sleep 10
+                                    
+                                    echo "Checking running process..."
+                                    ps -ef | grep Workforce
+                                    
+                                    echo "Checking port 8080..."
+                                    netstat -tulnp | grep 8080 || true
+                                    
                                     echo "===== Deployment Completed ====="
-                                    """
+                                    '''
                                 )
                             ]
                         )

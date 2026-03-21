@@ -132,8 +132,11 @@ export class ManagerAllExpenses implements OnInit {
 
         const request: ExpenseActionRequest = { action, comments: comments?.trim() || undefined };
 
-        // Use manager finance action endpoint
-        this.expenseService.managerFinanceAction(expense.expenseId, request).subscribe({
+        const actionObservable = expense.status === 'SUBMITTED'
+            ? this.expenseService.managerAction(expense.expenseId, request)
+            : this.expenseService.managerFinanceAction(expense.expenseId, request);
+
+        actionObservable.subscribe({
             next: () => {
                 const label = action === 'APPROVED' ? 'approved' : action === 'REIMBURSED' ? 'reimbursed' : 'rejected';
                 this.showToast(`Expense ${label} successfully`);
@@ -161,7 +164,7 @@ export class ManagerAllExpenses implements OnInit {
     }
 
     canTakeAction(expense: Expense): boolean {
-        return expense.status === 'MANAGER_APPROVED' || expense.status === 'FINANCE_APPROVED';
+        return expense.status === 'SUBMITTED' || expense.status === 'MANAGER_APPROVED' || expense.status === 'FINANCE_APPROVED';
     }
 
     getActionLabel(): string {

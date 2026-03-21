@@ -18,8 +18,8 @@ public interface LeaveApplicationRepository extends JpaRepository<LeaveApplicati
     Page<LeaveApplication> findByManagerCode(@Param("managerCode") String managerCode, Pageable pageable);
     @Query("select la from LeaveApplication la where la.employee.manager.employeeCode = :managerCode AND la.status = :status")
     Page<LeaveApplication> findByManagerCodeAndStatus(@Param("managerCode") String managerCode, @Param("status") LeaveStatus status, Pageable pageable);
-    @Query("select la from LeaveApplication la where la.employee.employeeId = :employeeId and la.status <> :cancelledStatus and la.status <> :rejectedStatus and la.startDate <= :endDate and la.endDate >= :startDate")
-    List<LeaveApplication> findOverlappingLeaves(@Param("employeeId") Integer employeeId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate, @Param("cancelledStatus") LeaveStatus cancelledStatus, @Param("rejectedStatus") LeaveStatus rejectedStatus);
+    @Query(value = "SELECT * FROM leave_application la WHERE la.employee_id = :employeeId AND la.status <> :cancelledStatus AND la.status <> :rejectedStatus AND la.start_date <= :endDate AND la.end_date >= :startDate", nativeQuery = true)
+    List<LeaveApplication> findOverlappingLeaves(@Param("employeeId") Integer employeeId, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate, @Param("cancelledStatus") String cancelledStatus, @Param("rejectedStatus") String rejectedStatus);
     long countByStatus(LeaveStatus status);
     @Query("SELECT la FROM LeaveApplication la WHERE la.status = :status AND la.startDate <= :today AND la.endDate >= :today")
     List<LeaveApplication> findActiveLeavesToday(@Param("status") LeaveStatus status, @Param("today") LocalDate today);

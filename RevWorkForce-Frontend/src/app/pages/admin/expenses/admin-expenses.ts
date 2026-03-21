@@ -160,7 +160,7 @@ export class AdminExpenses implements OnInit {
     }
 
     canTakeAction(expense: Expense): boolean {
-        return expense.status === 'MANAGER_APPROVED' || expense.status === 'FINANCE_APPROVED';
+        return expense.status === 'SUBMITTED' || expense.status === 'MANAGER_APPROVED' || expense.status === 'FINANCE_APPROVED';
     }
 
     getActionLabel(): string {

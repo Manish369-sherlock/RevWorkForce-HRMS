@@ -26,6 +26,14 @@ public interface ExpenseRepository extends JpaRepository<Expense, Integer> {
                                            @Param("status") ExpenseStatus status,
                                            Pageable pageable);
 
+    @Query("SELECT e FROM Expense e WHERE e.employee.manager.employeeId = :managerId AND e.status IN :statuses")
+    Page<Expense> findTeamExpensesByStatusIn(@Param("managerId") Integer managerId,
+                                             @Param("statuses") List<ExpenseStatus> statuses,
+                                             Pageable pageable);
+
+    @Query("SELECT e FROM Expense e WHERE e.employee.manager.employeeId = :managerId")
+    Page<Expense> findTeamExpenses(@Param("managerId") Integer managerId, Pageable pageable);
+
     // Finance: all expenses pending finance approval
     Page<Expense> findByStatus(ExpenseStatus status, Pageable pageable);
 

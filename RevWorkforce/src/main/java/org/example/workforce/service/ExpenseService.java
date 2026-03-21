@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.List;
 
 @Service
 public class ExpenseService {
@@ -129,6 +130,30 @@ public class ExpenseService {
         return page;
     }
 
+    @Transactional(readOnly = true)
+    public Page<Expense> getAllTeamExpenses(String email, ExpenseStatus status, Pageable pageable) {
+        Employee manager = employeeService.getEmployeeByEmail(email);
+        Page<Expense> page;
+        if (status != null) {
+            page = expenseRepository.findTeamExpensesByStatus(manager.getEmployeeId(), status, pageable);
+        } else {
+            page = expenseRepository.findTeamExpenses(manager.getEmployeeId(), pageable);
+        }
+        page.getContent().forEach(this::initializeExpenseAssociations);
+        return page;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Expense> getTeamFinancePendingExpenses(String email, Pageable pageable) {
+        Employee manager = employeeService.getEmployeeByEmail(email);
+        Page<Expense> page = expenseRepository.findTeamExpensesByStatusIn(
+                manager.getEmployeeId(),
+                List.of(ExpenseStatus.MANAGER_APPROVED, ExpenseStatus.FINANCE_APPROVED),
+                pageable);
+        page.getContent().forEach(this::initializeExpenseAssociations);
+        return page;
+    }
+
     // ─── Manager: Approve/Reject Expense ───
     @Transactional
     public Expense managerAction(String email, Integer expenseId, ExpenseActionRequest request) {
@@ -139,11 +164,11 @@ public class ExpenseService {
             throw new BadRequestException("This expense is not pending manager approval.");
         }
 
-        // Verify the manager manages this employee
+        // Verify the manager manages this employee OR is an ADMIN/MANAGER role with access
         Employee expenseOwner = expense.getEmployee();
         if (expenseOwner.getManager() == null ||
                 !expenseOwner.getManager().getEmployeeId().equals(manager.getEmployeeId())) {
-            if (manager.getRole() != Role.ADMIN) {
+            if (manager.getRole() != Role.ADMIN && manager.getRole() != Role.MANAGER) {
                 throw new BadRequestException("You are not authorized to action this expense.");
             }
         }
@@ -175,10 +200,11 @@ public class ExpenseService {
         return saved;
     }
 
-    // ─── Finance/Admin: Expenses pending finance approval ───
+    // ─── Finance/Admin: Expenses pending finance action (approved by manager or awaiting reimbursement) ───
     @Transactional(readOnly = true)
     public Page<Expense> getFinancePendingExpenses(Pageable pageable) {
-        Page<Expense> page = expenseRepository.findByStatus(ExpenseStatus.MANAGER_APPROVED, pageable);
+        Page<Expense> page = expenseRepository.findByStatusIn(
+                List.of(ExpenseStatus.MANAGER_APPROVED, ExpenseStatus.FINANCE_APPROVED), pageable);
         page.getContent().forEach(this::initializeExpenseAssociations);
         return page;
     }
@@ -202,9 +228,10 @@ public class ExpenseService {
         Employee financeUser = employeeService.getEmployeeByEmail(email);
         Expense expense = getExpenseById(expenseId);
 
-        if (expense.getStatus() != ExpenseStatus.MANAGER_APPROVED
+        if (expense.getStatus() != ExpenseStatus.SUBMITTED
+                && expense.getStatus() != ExpenseStatus.MANAGER_APPROVED
                 && expense.getStatus() != ExpenseStatus.FINANCE_APPROVED) {
-            throw new BadRequestException("This expense is not pending finance action.");
+            throw new BadRequestException("This expense is not pending action.");
         }
 
         Employee expenseOwner = expense.getEmployee();

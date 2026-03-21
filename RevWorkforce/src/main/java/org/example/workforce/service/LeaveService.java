@@ -51,7 +51,7 @@ public class LeaveService {
         }
         List<LeaveApplication> overlapping = leaveApplicationRepository.findOverlappingLeaves(
                 employee.getEmployeeId(), request.getStartDate(), request.getEndDate(),
-                LeaveStatus.CANCELLED, LeaveStatus.REJECTED);
+                LeaveStatus.CANCELLED.name(), LeaveStatus.REJECTED.name());
         if (!overlapping.isEmpty()) {
             throw new DuplicateResourceException("You already have a leave application overlapping with these dates");
         }

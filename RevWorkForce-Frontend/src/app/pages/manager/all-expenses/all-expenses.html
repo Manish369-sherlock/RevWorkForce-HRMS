@@ -115,7 +115,7 @@
                                     <span class="text-slate-900 text-[14px] font-semibold tabular-nums">₹{{ exp.totalAmount | number }}</span>
                                 </td>
                                 <td class="px-6 py-4 text-center">
-                                    <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold {{ getStatusColor(exp.status) }}">
+                                    <span class="whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-semibold {{ getStatusColor(exp.status) }}">
                                         {{ formatStatus(exp.status) }}
                                     </span>
                                 </td>
@@ -196,7 +196,7 @@
 
                 <!-- Modal Header -->
                 <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-                    <h2 class="text-slate-900 font-semibold text-[16px]">Finance Review</h2>
+                    <h2 class="text-slate-900 font-semibold text-[16px]">{{ exp.status === 'SUBMITTED' ? 'Manager Review' : 'Finance Review' }}</h2>
                     <button (click)="closeDetail()"
                             class="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,14 +304,16 @@
                                             Approve
                                         </div>
                                     </label>
-                                    <label class="flex-1 relative cursor-pointer">
-                                        <input formControlName="action" type="radio" value="REIMBURSED" class="peer sr-only"/>
-                                        <div class="w-full py-2 rounded-xl border text-center text-[12px] font-semibold transition-all
-                                                    peer-checked:bg-blue-500/15 peer-checked:border-blue-500/30 peer-checked:text-blue-600
-                                                    border-slate-200 text-slate-500 hover:border-slate-300">
-                                            Reimburse
-                                        </div>
-                                    </label>
+                                    @if (exp.status !== 'SUBMITTED') {
+                                        <label class="flex-1 relative cursor-pointer">
+                                            <input formControlName="action" type="radio" value="REIMBURSED" class="peer sr-only"/>
+                                            <div class="w-full py-2 rounded-xl border text-center text-[12px] font-semibold transition-all
+                                                        peer-checked:bg-blue-500/15 peer-checked:border-blue-500/30 peer-checked:text-blue-600
+                                                        border-slate-200 text-slate-500 hover:border-slate-300">
+                                                Reimburse
+                                            </div>
+                                        </label>
+                                    }
                                     <label class="flex-1 relative cursor-pointer">
                                         <input formControlName="action" type="radio" value="REJECTED" class="peer sr-only"/>
                                         <div class="w-full py-2 rounded-xl border text-center text-[12px] font-semibold transition-all

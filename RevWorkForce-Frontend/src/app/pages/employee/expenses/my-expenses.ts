@@ -299,6 +299,7 @@ export class MyExpenses implements OnInit {
 
     isStepCompleted(status: string, stepKey: string): boolean {
         if (status === 'REJECTED') return false;
+        if (status === 'REIMBURSED') return true;
         return this.getStepIndex(status) > this.getStepIndex(stepKey);
     }
 

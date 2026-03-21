@@ -21,6 +21,8 @@ export class TeamExpenses implements OnInit {
     pageSize = 10;
     totalPages = signal(0);
     totalElements = signal(0);
+    viewMode = signal<'all' | 'submitted' | 'pending'>('all');
+    statusFilter = signal('');
 
     showDetailModal = signal(false);
     selectedExpense = signal<Expense | null>(null);
@@ -28,6 +30,12 @@ export class TeamExpenses implements OnInit {
     actionForm!: FormGroup;
 
     skeletonRows = Array(5).fill(0);
+
+    statusOptions = [
+        { value: '', label: 'All Status' },
+        { value: 'REIMBURSED', label: 'Reimbursed' },
+        { value: 'REJECTED', label: 'Rejected' },
+    ];
 
     constructor(
         private expenseService: ExpenseService,
@@ -42,10 +50,35 @@ export class TeamExpenses implements OnInit {
         this.loadExpenses();
     }
 
+    switchView(mode: 'all' | 'submitted' | 'pending'): void {
+        this.viewMode.set(mode);
+        this.page.set(0);
+        this.loadExpenses();
+    }
+
+    onStatusFilterChange(event: Event): void {
+        this.statusFilter.set((event.target as HTMLSelectElement).value);
+        this.page.set(0);
+        this.loadExpenses();
+    }
+
     loadExpenses(): void {
         this.loading.set(true);
         this.error.set('');
-        this.expenseService.getTeamExpenses(this.page(), this.pageSize).subscribe({
+
+        let obs;
+        switch (this.viewMode()) {
+            case 'pending':
+                obs = this.expenseService.getTeamFinancePending(this.page(), this.pageSize);
+                break;
+            case 'all':
+                obs = this.expenseService.getTeamAllExpenses(this.statusFilter() || undefined, this.page(), this.pageSize);
+                break;
+            default:
+                obs = this.expenseService.getTeamExpenses(this.page(), this.pageSize);
+        }
+
+        obs.subscribe({
             next: (res) => {
                 this.expenses.set(res.content);
                 this.totalPages.set(res.totalPages);

@@ -50,6 +50,17 @@ export class ExpenseService {
         return this.http.get<PageResponse<Expense>>(`${this.apiUrl}/manager/expenses`, { params });
     }
 
+    getTeamAllExpenses(status?: string, page = 0, size = 10): Observable<PageResponse<Expense>> {
+        let params = new HttpParams().set('page', page).set('size', size);
+        if (status) params = params.set('status', status);
+        return this.http.get<PageResponse<Expense>>(`${this.apiUrl}/manager/expenses/team-all`, { params });
+    }
+
+    getTeamFinancePending(page = 0, size = 10): Observable<PageResponse<Expense>> {
+        const params = new HttpParams().set('page', page).set('size', size);
+        return this.http.get<PageResponse<Expense>>(`${this.apiUrl}/manager/expenses/team-finance-pending`, { params });
+    }
+
     managerAction(id: number, request: ExpenseActionRequest): Observable<Expense> {
         return this.http.patch<Expense>(`${this.apiUrl}/manager/expenses/${id}/action`, request);
     }

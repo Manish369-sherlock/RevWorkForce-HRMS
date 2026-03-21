@@ -95,7 +95,17 @@ export class Settings implements OnInit {
 
         this.saving.set(true);
         this.error.set('');
-        this.empService.updateMyProfile(this.profileForm.getRawValue()).subscribe({
+        
+        // Only send fields that the backend UpdateProfileRequest expects
+        const formValue = this.profileForm.getRawValue();
+        const updateRequest = {
+            phone: formValue.phone || '',
+            address: formValue.address || '',
+            emergencyContactName: formValue.emergencyContactName || '',
+            emergencyContactPhone: formValue.emergencyContactPhone || ''
+        };
+
+        this.empService.updateMyProfile(updateRequest).subscribe({
             next: (res) => {
                 if (res.success && res.data) {
                     this.profile.set(res.data);
@@ -104,7 +114,17 @@ export class Settings implements OnInit {
                 this.saving.set(false);
             },
             error: (err) => {
-                this.error.set(err.error?.message || 'Failed to update profile');
+                let errorMsg = err.error?.message || 'Failed to update profile';
+                
+                // If there are specific field errors, list them
+                if (err.error?.errors) {
+                    const fieldErrors = Object.values(err.error.errors).join(', ');
+                    if (fieldErrors) {
+                        errorMsg = `${errorMsg}: ${fieldErrors}`;
+                    }
+                }
+                
+                this.error.set(errorMsg);
                 this.saving.set(false);
             }
         });

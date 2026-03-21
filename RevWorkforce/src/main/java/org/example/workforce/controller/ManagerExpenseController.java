@@ -38,6 +38,29 @@ public class ManagerExpenseController {
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "submittedDate"))));
     }
 
+    @GetMapping("/team-all")
+    public ResponseEntity<Page<Expense>> getAllTeamExpenses(
+            Authentication auth,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        ExpenseStatus expenseStatus = null;
+        if (status != null) {
+            try { expenseStatus = ExpenseStatus.valueOf(status.toUpperCase()); } catch (Exception ignored) {}
+        }
+        return ResponseEntity.ok(expenseService.getAllTeamExpenses(auth.getName(), expenseStatus,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))));
+    }
+
+    @GetMapping("/team-finance-pending")
+    public ResponseEntity<Page<Expense>> getTeamFinancePending(
+            Authentication auth,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(expenseService.getTeamFinancePendingExpenses(auth.getName(),
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "managerActionDate"))));
+    }
+
     // Approve or reject team expense
     @PatchMapping("/{id}/action")
     public ResponseEntity<Expense> actionExpense(

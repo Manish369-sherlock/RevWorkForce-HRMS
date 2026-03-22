@@ -23,10 +23,6 @@ import java.util.stream.Collectors;
 @Service
 public class AIService {
 
-    // ═══════════════════════════════════════════
-    //  DEPENDENCIES
-    // ═══════════════════════════════════════════
-
     @Autowired private OllamaClient ollamaClient;
     @Autowired private LeaveService leaveService;
     @Autowired private AttendanceService attendanceService;
@@ -35,10 +31,6 @@ public class AIService {
     @Autowired private AnnouncementService announcementService;
     @Autowired private PerformanceService performanceService;
     @Autowired private NotificationService notificationService;
-
-    // ═══════════════════════════════════════════
-    //  CONVERSATION STATE
-    // ═══════════════════════════════════════════
 
     private final ConcurrentHashMap<String, ConversationContext> activeFlows = new ConcurrentHashMap<>();
 
@@ -61,21 +53,11 @@ public class AIService {
         }
     }
 
-    // ═══════════════════════════════════════════
-    //  MAIN ENTRY POINT
-    // ═══════════════════════════════════════════
-
     public AIChatResponse processMessage(String email, AIChatRequest request) {
         String message = request.getMessage().trim();
         String lower = message.toLowerCase();
-
-        // Get user role
         Role userRole = getUserRole(email);
-
-        // Clean expired contexts
         activeFlows.entrySet().removeIf(e -> e.getValue().isExpired());
-
-        // Check active flow
         ConversationContext ctx = activeFlows.get(email);
         if (ctx != null && !ctx.isExpired()) {
             if (isAbortCommand(lower)) {
@@ -86,14 +68,10 @@ public class AIService {
             ctx.touch();
             return continueFlow(email, ctx, message);
         }
-
-        // Detect intent
         String intent = detectIntent(lower, userRole);
         if (intent != null) {
             return startAction(email, intent, message, userRole);
         }
-
-        // General chat
         return handleGeneralChat(request, userRole);
     }
 
@@ -114,12 +92,7 @@ public class AIService {
         };
     }
 
-    // ═══════════════════════════════════════════
-    //  INTENT DETECTION (keyword-based, reliable)
-    // ═══════════════════════════════════════════
-
     private String detectIntent(String msg, Role userRole) {
-        // ── Manager / Admin specific intents (check first) ──
         if (userRole == Role.MANAGER || userRole == Role.ADMIN) {
             if (containsAny(msg, "team leaves", "team leave", "team's leave",
                     "pending team", "my team leaves", "team requests")) {
@@ -139,7 +112,6 @@ public class AIService {
                 return "GET_TEAM_REVIEWS";
             }
         }
-        // ── Admin-only intents ──
         if (userRole == Role.ADMIN) {
             if (containsAny(msg, "admin dashboard", "admin stats", "admin overview",
                     "system dashboard", "workforce stats", "overall stats")) {
@@ -150,7 +122,6 @@ public class AIService {
                 return "GET_ALL_LEAVES";
             }
         }
-        // Apply leave
         if (containsAny(msg, "apply leave", "apply for leave", "request leave",
                 "want leave", "need leave", "take leave", "apply sick",
                 "apply casual", "apply earned", "want a leave", "need a leave",
@@ -159,12 +130,10 @@ public class AIService {
                 "can you apply", "please apply", "i want to apply")) {
             return "APPLY_LEAVE";
         }
-        // Cancel leave
         if (containsAny(msg, "cancel leave", "cancel my leave", "withdraw leave",
                 "revoke leave", "delete leave", "cancel a leave")) {
             return "CANCEL_LEAVE";
         }
-        // Check in
         if (containsAny(msg, "check in", "checkin", "check-in", "clock in",
                 "punch in", "mark attendance", "start work", "mark my attendance")) {
             if (!containsAny(msg, "did i check", "have i check", "am i check",
@@ -172,93 +141,77 @@ public class AIService {
                 return "CHECK_IN";
             }
         }
-        // Check out
         if (containsAny(msg, "check out", "checkout", "check-out", "clock out",
                 "punch out", "end work", "done for today", "log off", "sign off")) {
             return "CHECK_OUT";
         }
-        // Update profile
         if (containsAny(msg, "update profile", "update my profile", "change my phone",
                 "change phone", "update phone", "change address", "update address",
                 "update emergency", "change emergency", "edit profile", "edit my profile")) {
             return "UPDATE_PROFILE";
         }
-        // Create goal
         if (containsAny(msg, "create goal", "new goal", "add goal", "set goal",
                 "create a goal", "add a goal", "set a goal")) {
             return "CREATE_GOAL";
         }
-        // Leave balance
         if (containsAny(msg, "leave balance", "how many leaves", "my leaves balance",
                 "leave details", "leaves do i have", "remaining leaves",
                 "available leaves", "check my leave", "show leave balance",
                 "leave count", "leave remaining")) {
             return "GET_LEAVE_BALANCE";
         }
-        // My leaves list
         if (containsAny(msg, "my leaves", "my leave applications", "my leave requests",
                 "show my leaves", "list my leaves", "pending leaves",
                 "my pending leave", "leave history", "leave applications")) {
             return "GET_MY_LEAVES";
         }
-        // Attendance today
         if (containsAny(msg, "today attendance", "today's attendance", "did i check",
                 "attendance today", "am i checked in", "have i checked in",
                 "my check-in today", "today status", "checked in today")) {
             return "GET_ATTENDANCE_TODAY";
         }
-        // Attendance summary
         if (containsAny(msg, "attendance summary", "attendance report", "monthly attendance",
                 "attendance this month", "my attendance", "attendance record",
                 "attendance history", "show attendance", "present days", "absent days")) {
             return "GET_ATTENDANCE_SUMMARY";
         }
-        // Dashboard
         if (containsAny(msg, "my dashboard", "dashboard summary", "show dashboard",
                 "dashboard details", "my overview", "my summary")) {
             return "GET_MY_DASHBOARD";
         }
-        // Announcements
         if (containsAny(msg, "announcement", "announcements", "any announcement",
                 "company news", "latest news", "notices", "company update",
                 "recent announcements")) {
             return "GET_ANNOUNCEMENTS";
         }
-        // Profile
         if (containsAny(msg, "my profile", "profile details", "show profile",
                 "my details", "my information", "my info", "about me",
                 "employee details", "show my profile", "view profile")) {
             return "GET_MY_PROFILE";
         }
-        // Holidays
         if (containsAny(msg, "holiday", "holidays", "upcoming holiday",
                 "public holiday", "holiday list", "holiday dates", "next holiday",
                 "upcoming holidays", "show holidays")) {
             return "GET_HOLIDAYS";
         }
-        // My goals
         if (containsAny(msg, "my goals", "show goals", "show my goals",
                 "goal progress", "my targets", "list goals", "view goals")) {
             return "GET_MY_GOALS";
         }
-        // My reviews
         if (containsAny(msg, "my reviews", "performance review", "my performance",
                 "show reviews", "show my reviews", "review status",
                 "my performance reviews")) {
             return "GET_MY_REVIEWS";
         }
-        // Notifications
         if (containsAny(msg, "notifications", "my notifications", "unread notifications",
                 "notification count", "any notifications", "show notifications")) {
             return "GET_NOTIFICATIONS";
         }
-        // Help
         if (containsAny(msg, "help", "what can you do", "capabilities",
                 "what do you do", "how to", "commands", "features",
                 "what all can you", "guide me")) {
             return "HELP";
         }
-        // Greetings
         if (containsAny(msg, "hello", "hi", "hey", "good morning",
                 "good afternoon", "good evening")) {
             return "GREETING";
@@ -266,22 +219,15 @@ public class AIService {
         return null;
     }
 
-    // ═══════════════════════════════════════════
-    //  START ACTION / DISPATCH
-    // ═══════════════════════════════════════════
-
     private AIChatResponse startAction(String email, String intent, String message, Role userRole) {
         try {
             switch (intent) {
-                // Multi-turn flows (all roles)
                 case "APPLY_LEAVE":    return startApplyLeaveFlow(email, message);
                 case "CANCEL_LEAVE":   return startCancelLeaveFlow(email);
                 case "CHECK_IN":       return startCheckInFlow(email);
                 case "CHECK_OUT":      return startCheckOutFlow(email);
                 case "UPDATE_PROFILE": return startUpdateProfileFlow(email);
                 case "CREATE_GOAL":    return startCreateGoalFlow(email, message);
-
-                // Single-turn queries (all roles)
                 case "GET_LEAVE_BALANCE":     return getLeaveBalance(email);
                 case "GET_MY_LEAVES":         return getMyLeaves(email);
                 case "GET_ATTENDANCE_TODAY":   return getAttendanceToday(email);
@@ -295,15 +241,11 @@ public class AIService {
                 case "GET_NOTIFICATIONS":     return getNotifications(email);
                 case "HELP":                  return getHelp(userRole);
                 case "GREETING":              return getGreeting(email, userRole);
-
-                // Manager / Admin actions
                 case "GET_TEAM_LEAVES":       return getTeamLeaves(email, userRole);
                 case "APPROVE_LEAVE":         return startApproveLeavFlow(email, userRole);
                 case "REJECT_LEAVE":          return startRejectLeaveFlow(email, userRole);
                 case "GET_TEAM_ATTENDANCE":   return getTeamAttendance(email, userRole);
                 case "GET_TEAM_REVIEWS":      return getTeamReviews(email, userRole);
-
-                // Admin-only actions
                 case "GET_ADMIN_DASHBOARD":   return getAdminDashboard(email, userRole);
                 case "GET_ALL_LEAVES":        return getAllLeaves(email, userRole);
 
@@ -316,10 +258,6 @@ public class AIService {
                     getDefaultQuickReplies(userRole));
         }
     }
-
-    // ═══════════════════════════════════════════
-    //  CONTINUE ACTIVE FLOW
-    // ═══════════════════════════════════════════
 
     private AIChatResponse continueFlow(String email, ConversationContext ctx, String message) {
         try {
@@ -344,15 +282,9 @@ public class AIService {
         }
     }
 
-    // ═══════════════════════════════════════════
-    //  FLOW: APPLY LEAVE
-    // ═══════════════════════════════════════════
-
     private AIChatResponse startApplyLeaveFlow(String email, String message) {
         ConversationContext ctx = new ConversationContext("APPLY_LEAVE");
         String lower = message.toLowerCase();
-
-        // Pre-parse dates from the initial message
         List<LocalDate> dates = extractDates(message);
         if (dates.size() >= 1) {
             ctx.data.put("startDate", dates.get(0).toString());
@@ -360,8 +292,6 @@ public class AIService {
         if (dates.size() >= 2) {
             ctx.data.put("endDate", dates.get(1).toString());
         }
-
-        // Pre-parse leave type
         Integer typeId = detectLeaveTypeFromMessage(lower);
         if (typeId != null) {
             ctx.data.put("leaveTypeId", typeId.toString());
@@ -371,14 +301,10 @@ public class AIService {
                         .ifPresent(t -> ctx.data.put("leaveTypeName", t.getLeaveTypeName()));
             } catch (Exception ignored) {}
         }
-
-        // Pre-parse reason
         String reason = extractReason(message);
         if (reason != null) {
             ctx.data.put("reason", reason);
         }
-
-        // Determine what we still need
         activeFlows.put(email, ctx);
         return askNextLeaveField(ctx);
     }
@@ -386,8 +312,6 @@ public class AIService {
     private AIChatResponse continueApplyLeave(String email, ConversationContext ctx, String msg) {
         String lower = msg.toLowerCase().trim();
         int step = ctx.step;
-
-        // Step 0: waiting for leave type
         if (step == 0 && !ctx.data.containsKey("leaveTypeId")) {
             Integer typeId = detectLeaveTypeFromInput(lower);
             if (typeId == null) {
@@ -404,8 +328,6 @@ public class AIService {
             }
             return askNextLeaveField(ctx);
         }
-
-        // Step 1: waiting for start date
         if (step == 1 && !ctx.data.containsKey("startDate")) {
             LocalDate date = parseNaturalDate(msg);
             if (date == null) {
@@ -417,8 +339,6 @@ public class AIService {
             ctx.data.put("startDate", date.toString());
             return askNextLeaveField(ctx);
         }
-
-        // Step 2: waiting for end date
         if (step == 2 && !ctx.data.containsKey("endDate")) {
             if (lower.equals("same day") || lower.equals("single day") || lower.equals("1 day")
                     || lower.equals("one day") || lower.equals("same")) {
@@ -438,8 +358,6 @@ public class AIService {
             }
             return askNextLeaveField(ctx);
         }
-
-        // Step 3: waiting for reason
         if (step == 3 && !ctx.data.containsKey("reason")) {
             if (msg.length() < 2) {
                 return reply("Please provide a brief reason for your leave.");
@@ -447,8 +365,6 @@ public class AIService {
             ctx.data.put("reason", msg);
             return askNextLeaveField(ctx);
         }
-
-        // Step 4: confirmation
         if (step == 4) {
             if (lower.contains("confirm") || lower.contains("yes") || lower.contains("submit")
                     || lower.contains("apply") || lower.contains("proceed")) {
@@ -467,7 +383,6 @@ public class AIService {
     }
 
     private AIChatResponse askNextLeaveField(ConversationContext ctx) {
-        // Check what's missing and ask for it
         if (!ctx.data.containsKey("leaveTypeId")) {
             ctx.step = 0;
             StringBuilder sb = new StringBuilder("Sure! I'll help you apply for leave.");
@@ -497,8 +412,6 @@ public class AIService {
             return reply("What's the reason for your leave?",
                     "Personal work", "Not feeling well", "Family commitment", "Medical appointment");
         }
-
-        // All data collected → show confirmation
         ctx.step = 4;
         LocalDate start = LocalDate.parse(ctx.data.get("startDate"));
         LocalDate end = LocalDate.parse(ctx.data.get("endDate"));
@@ -554,10 +467,6 @@ public class AIService {
         }
     }
 
-    // ═══════════════════════════════════════════
-    //  FLOW: CANCEL LEAVE
-    // ═══════════════════════════════════════════
-
     private AIChatResponse startCancelLeaveFlow(String email) {
         try {
             Page<LeaveApplication> pending = leaveService.getMyLeaves(email, LeaveStatus.PENDING,
@@ -592,7 +501,6 @@ public class AIService {
         String lower = msg.toLowerCase().trim();
 
         if (ctx.step == 0) {
-            // Extract leave ID
             Pattern p = Pattern.compile("\\d+");
             Matcher m = p.matcher(msg);
             if (!m.find()) {
@@ -630,12 +538,7 @@ public class AIService {
         return reply("Something went wrong. Please try again.", "Cancel Leave", "Help");
     }
 
-    // ═══════════════════════════════════════════
-    //  FLOW: CHECK IN
-    // ═══════════════════════════════════════════
-
     private AIChatResponse startCheckInFlow(String email) {
-        // Check if already checked in
         try {
             var status = attendanceService.getTodayStatus(email);
             if (status.getCheckInTime() != null) {
@@ -697,10 +600,6 @@ public class AIService {
             return reply("❌ Check-in failed: " + e.getMessage(), "My Attendance", "Help");
         }
     }
-
-    // ═══════════════════════════════════════════
-    //  FLOW: CHECK OUT
-    // ═══════════════════════════════════════════
 
     private AIChatResponse startCheckOutFlow(String email) {
         try {
@@ -768,10 +667,6 @@ public class AIService {
             return reply("❌ Check-out failed: " + e.getMessage(), "My Attendance", "Help");
         }
     }
-
-    // ═══════════════════════════════════════════
-    //  FLOW: UPDATE PROFILE
-    // ═══════════════════════════════════════════
 
     private AIChatResponse startUpdateProfileFlow(String email) {
         ConversationContext ctx = new ConversationContext("UPDATE_PROFILE");
@@ -854,10 +749,6 @@ public class AIService {
             return reply("❌ Could not update profile: " + e.getMessage(), "My Profile", "Help");
         }
     }
-
-    // ═══════════════════════════════════════════
-    //  FLOW: CREATE GOAL
-    // ═══════════════════════════════════════════
 
     private AIChatResponse startCreateGoalFlow(String email, String message) {
         ConversationContext ctx = new ConversationContext("CREATE_GOAL");
@@ -948,10 +839,6 @@ public class AIService {
             return reply("❌ Could not create goal: " + e.getMessage(), "My Goals", "Help");
         }
     }
-
-    // ═══════════════════════════════════════════
-    //  SINGLE-TURN: DATA QUERIES
-    // ═══════════════════════════════════════════
 
     private AIChatResponse getLeaveBalance(String email) {
         List<LeaveBalance> balances = leaveService.getMyLeaveBalance(email);
@@ -1311,10 +1198,6 @@ public class AIService {
         return reply(sb.toString(), getDefaultQuickReplies(role));
     }
 
-    // ═══════════════════════════════════════════
-    //  MANAGER / ADMIN ACTIONS
-    // ═══════════════════════════════════════════
-
     private AIChatResponse getTeamLeaves(String email, Role role) {
         try {
             Page<LeaveApplication> leaves;
@@ -1531,12 +1414,7 @@ public class AIService {
         }
     }
 
-    // ═══════════════════════════════════════════
-    //  GENERAL CHAT (Ollama fallback)
-    // ═══════════════════════════════════════════
-
     private AIChatResponse handleGeneralChat(AIChatRequest request, Role userRole) {
-        // ── Fast-fail if Ollama is not running ──
         if (!ollamaClient.isAvailable()) {
             return reply("I'm not sure I understand that. Type 'help' to see what I can do for you.",
                     getDefaultQuickReplies(userRole));
@@ -1545,8 +1423,6 @@ public class AIService {
         try {
             StringBuilder prompt = new StringBuilder();
             prompt.append("You are a concise HR assistant. Reply in 1-2 sentences. No markdown.\n\n");
-
-            // Only send last 4 history entries to keep prompt short → faster inference
             if (request.getHistory() != null) {
                 List<AIChatRequest.ChatHistoryEntry> recent = request.getHistory();
                 int start = Math.max(0, recent.size() - 4);
@@ -1567,10 +1443,6 @@ public class AIService {
         return reply("I'm not sure I understand that. Type 'help' to see what I can do for you.",
                 getDefaultQuickReplies(userRole));
     }
-
-    // ═══════════════════════════════════════════
-    //  HELPERS
-    // ═══════════════════════════════════════════
 
     private AIChatResponse reply(String message, String... quickReplies) {
         return AIChatResponse.builder()
@@ -1614,16 +1486,11 @@ public class AIService {
         }
     }
 
-    // ═══════════════════════════════════════════
-    //  LEAVE TYPE DETECTION
-    // ═══════════════════════════════════════════
-
     private Integer detectLeaveTypeFromMessage(String lower) {
         try {
             List<LeaveType> types = leaveService.getAllLeaveType();
             for (LeaveType t : types) {
                 String name = t.getLeaveTypeName().toLowerCase();
-                // Check for name parts in message
                 String[] words = name.split("\\s+");
                 for (String word : words) {
                     if (word.length() > 3 && lower.contains(word)) {
@@ -1632,8 +1499,6 @@ public class AIService {
                 }
             }
         } catch (Exception ignored) {}
-
-        // Fallback keyword matching
         if (lower.contains("sick")) return findLeaveTypeId("sick");
         if (lower.contains("casual")) return findLeaveTypeId("casual");
         if (lower.contains("earned")) return findLeaveTypeId("earned");
@@ -1650,7 +1515,6 @@ public class AIService {
                     return t.getLeaveTypeId();
                 }
             }
-            // Partial match
             for (LeaveType t : types) {
                 String name = t.getLeaveTypeName().toLowerCase();
                 for (String word : name.split("\\s+")) {
@@ -1660,8 +1524,6 @@ public class AIService {
                 }
             }
         } catch (Exception ignored) {}
-
-        // Number input
         try {
             int id = Integer.parseInt(lower.replaceAll("[^0-9]", ""));
             return id > 0 ? id : null;
@@ -1680,23 +1542,15 @@ public class AIService {
         }
     }
 
-    // ═══════════════════════════════════════════
-    //  NATURAL DATE PARSING
-    // ═══════════════════════════════════════════
-
     private LocalDate parseNaturalDate(String input) {
         if (input == null || input.isBlank()) return null;
         String text = input.trim().toLowerCase()
                 .replaceAll("[,.]", " ").replaceAll("\\s+", " ").trim();
 
         LocalDate today = LocalDate.now();
-
-        // Relative dates
         if (text.equals("today")) return today;
         if (text.equals("tomorrow") || text.equals("tmrw") || text.equals("tmr")) return today.plusDays(1);
         if (text.equals("day after tomorrow")) return today.plusDays(2);
-
-        // "next monday", "this friday", etc.
         if (text.startsWith("next ") || text.startsWith("this ")) {
             String dayName = text.substring(5).trim();
             DayOfWeek dow = parseDayOfWeek(dayName);
@@ -1706,13 +1560,9 @@ public class AIService {
                         : today.with(TemporalAdjusters.nextOrSame(dow));
             }
         }
-
-        // ISO format: 2026-03-11
         try {
             return LocalDate.parse(text);
         } catch (Exception ignored) {}
-
-        // "March 11", "March 11 2026", "Mar 11", "Mar 11 2026"
         Pattern p1 = Pattern.compile("(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+(\\d{1,2})(?:\\s+(\\d{4}))?");
         Matcher m1 = p1.matcher(text);
         if (m1.find()) {
@@ -1721,15 +1571,12 @@ public class AIService {
             int year = m1.group(3) != null ? Integer.parseInt(m1.group(3)) : today.getYear();
             try {
                 LocalDate parsed = LocalDate.of(year, month, day);
-                // If date is in the past this year, try next year
                 if (parsed.isBefore(today) && m1.group(3) == null) {
                     parsed = LocalDate.of(year + 1, month, day);
                 }
                 return parsed;
             } catch (Exception ignored) {}
         }
-
-        // "11 March", "11 March 2026"
         Pattern p2 = Pattern.compile("(\\d{1,2})\\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\\s+(\\d{4}))?");
         Matcher m2 = p2.matcher(text);
         if (m2.find()) {
@@ -1744,8 +1591,6 @@ public class AIService {
                 return parsed;
             } catch (Exception ignored) {}
         }
-
-        // dd/MM/yyyy or dd-MM-yyyy
         Pattern p3 = Pattern.compile("(\\d{1,2})[/\\-](\\d{1,2})(?:[/\\-](\\d{2,4}))?");
         Matcher m3 = p3.matcher(text);
         if (m3.find()) {
@@ -1753,12 +1598,9 @@ public class AIService {
             int b = Integer.parseInt(m3.group(2));
             int year = m3.group(3) != null ? Integer.parseInt(m3.group(3)) : today.getYear();
             if (year < 100) year += 2000;
-
-            // Try dd/MM first
             try {
                 return LocalDate.of(year, b, a);
             } catch (Exception ignored) {}
-            // Try MM/dd
             try {
                 return LocalDate.of(year, a, b);
             } catch (Exception ignored) {}
@@ -1770,9 +1612,6 @@ public class AIService {
     private List<LocalDate> extractDates(String message) {
         List<LocalDate> dates = new ArrayList<>();
         String text = message.toLowerCase().replaceAll("[,.]", " ");
-
-        // Try to find all date-like patterns
-        // "March 11", "March 12", etc.
         Pattern monthDay = Pattern.compile("(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+(\\d{1,2})(?:\\s+(\\d{4}))?");
         Matcher m = monthDay.matcher(text);
         while (m.find()) {
@@ -1781,15 +1620,11 @@ public class AIService {
             int year = m.group(3) != null ? Integer.parseInt(m.group(3)) : LocalDate.now().getYear();
             try { dates.add(LocalDate.of(year, month, day)); } catch (Exception ignored) {}
         }
-
-        // ISO dates: 2026-03-11
         Pattern iso = Pattern.compile("(\\d{4})-(\\d{2})-(\\d{2})");
         Matcher mi = iso.matcher(message);
         while (mi.find()) {
             try { dates.add(LocalDate.parse(mi.group())); } catch (Exception ignored) {}
         }
-
-        // Relative dates in text
         if (text.contains("tomorrow")) dates.add(LocalDate.now().plusDays(1));
 
         return dates;

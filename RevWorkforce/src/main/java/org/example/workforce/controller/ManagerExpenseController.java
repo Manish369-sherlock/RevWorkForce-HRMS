@@ -15,20 +15,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Manager Expense endpoints.
- * - Regular managers: view team expenses and approve/reject them.
- * - Finance managers: view ALL expenses, approve at finance level, and mark as reimbursed.
- */
 @RestController
 @RequestMapping("/api/manager/expenses")
 public class ManagerExpenseController {
 
     @Autowired private ExpenseService expenseService;
-
-    // ─── Team Expenses (for regular manager approval) ───
-
-    // Get team expenses pending approval
     @GetMapping
     public ResponseEntity<Page<Expense>> getTeamExpenses(
             Authentication auth,
@@ -60,8 +51,6 @@ public class ManagerExpenseController {
         return ResponseEntity.ok(expenseService.getTeamFinancePendingExpenses(auth.getName(),
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "managerActionDate"))));
     }
-
-    // Approve or reject team expense
     @PatchMapping("/{id}/action")
     public ResponseEntity<Expense> actionExpense(
             Authentication auth,
@@ -78,10 +67,6 @@ public class ManagerExpenseController {
                 .contentType(MediaType.parseMediaType(receipt.contentType()))
                 .body(receipt.resource());
     }
-
-    // ─── All Expenses (for finance managers — see all employee expenses) ───
-
-    // Get all expenses across the org (optionally filter by status)
     @GetMapping("/all")
     public ResponseEntity<Page<Expense>> getAllExpenses(
             @RequestParam(required = false) String status,
@@ -94,8 +79,6 @@ public class ManagerExpenseController {
         return ResponseEntity.ok(expenseService.getAllExpenses(expenseStatus,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))));
     }
-
-    // Get expenses pending finance approval
     @GetMapping("/finance-pending")
     public ResponseEntity<Page<Expense>> getFinancePending(
             @RequestParam(defaultValue = "0") int page,
@@ -103,8 +86,6 @@ public class ManagerExpenseController {
         return ResponseEntity.ok(expenseService.getFinancePendingExpenses(
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "managerActionDate"))));
     }
-
-    // Finance action (approve, reject, reimburse) — for finance managers
     @PatchMapping("/{id}/finance-action")
     public ResponseEntity<Expense> financeAction(
             Authentication auth,

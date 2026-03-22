@@ -72,8 +72,6 @@ class NetworkIpUtilTest {
         when(request.getHeader("X-Forwarded-For")).thenReturn("127.0.0.1");
         when(request.getHeader("X-Real-IP")).thenReturn(null);
         when(request.getRemoteAddr()).thenReturn("192.168.1.50");
-
-        // Loopback in XFF is skipped, falls through to remoteAddr
         String result = NetworkIpUtil.resolveClientIp(request);
         assertEquals("192.168.1.50", result);
     }
@@ -90,26 +88,7 @@ class NetworkIpUtilTest {
 
     @Test
     void testGetLocalNetworkIp() {
-        // This may return null depending on the environment
-        // Just verify it doesn't throw
         assertDoesNotThrow(() -> NetworkIpUtil.getLocalNetworkIp());
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

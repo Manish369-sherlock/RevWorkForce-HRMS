@@ -47,7 +47,6 @@ class AttendanceServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Inject @Value fields that Mockito doesn't handle
         ReflectionTestUtils.setField(attendanceService, "officeStartTime", "09:00");
         ReflectionTestUtils.setField(attendanceService, "officeEndTime", "18:00");
         ReflectionTestUtils.setField(attendanceService, "lateThresholdMinutes", 15);

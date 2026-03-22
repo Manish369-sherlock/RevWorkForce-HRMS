@@ -95,7 +95,6 @@ class RefreshTokenServiceTest {
         verify(refreshTokenRepository).delete(expired);
     }
 
-
     @Test
     void revokeTokenByEmployee_EmployeeNotFound_ThrowsException() {
         when(employeeRepository.findByEmail("unknown@test.com")).thenReturn(Optional.empty());

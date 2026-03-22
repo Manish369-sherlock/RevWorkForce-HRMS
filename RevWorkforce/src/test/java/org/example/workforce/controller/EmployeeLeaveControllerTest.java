@@ -57,7 +57,7 @@ class EmployeeLeaveControllerTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
-        
+
         leaveApplyRequest = new LeaveApplyRequest();
         leaveApplyRequest.setLeaveTypeId(1);
         leaveApplyRequest.setStartDate(LocalDate.now().plusDays(1));
@@ -68,8 +68,6 @@ class EmployeeLeaveControllerTest {
                 .leaveId(1)
                 .status(LeaveStatus.PENDING)
                 .build();
-
-        // Mock IP access control to allow all IPs for testing
         when(ipAccessControlService.isIpAllowed(anyString())).thenReturn(true);
     }
 

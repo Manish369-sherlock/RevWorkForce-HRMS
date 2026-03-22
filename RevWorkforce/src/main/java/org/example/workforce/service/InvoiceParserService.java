@@ -17,12 +17,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * AI-powered invoice/receipt parser.
- * Sends the invoice text (or a description of the uploaded image)
- * to Ollama and extracts structured fields.
- * Falls back to regex-based extraction when Ollama is not available.
- */
 @Service
 public class InvoiceParserService {
 
@@ -39,18 +33,11 @@ public class InvoiceParserService {
             "MEDICAL", "TRANSPORTATION", "OTHER"
     );
 
-    /**
-     * Parse an uploaded file (image or PDF).
-     * - PDF: extracts text with PDFBox, then parses with AI or regex fallback
-     * - Image: uses LLaVA vision model
-     */
     public InvoiceParseResponse parseUploadedFile(String base64Data, String fileType) {
         if (base64Data == null || base64Data.isBlank()) {
             return InvoiceParseResponse.builder()
                     .success(false).errorMessage("No file provided").build();
         }
-
-        // Strip data URI prefix (e.g., "data:image/jpeg;base64," or "data:application/pdf;base64,")
         String cleanBase64 = base64Data.contains(",")
                 ? base64Data.substring(base64Data.indexOf(",") + 1)
                 : base64Data;
@@ -64,10 +51,6 @@ public class InvoiceParserService {
         }
     }
 
-    /**
-     * Extract text from PDF using PDFBox → enhanced regex first (instant), AI only if regex fails.
-     * PRIORITY: regex is instant (~0ms) vs AI (~10-60s), so regex should handle 90%+ of invoices.
-     */
     private InvoiceParseResponse parsePdf(String base64Pdf) {
         try {
             byte[] pdfBytes = Base64.getDecoder().decode(base64Pdf);
@@ -85,11 +68,8 @@ public class InvoiceParserService {
 
             log.info("PDF text extracted ({} chars). Running instant regex parser first...", extractedText.length());
             log.debug("Extracted PDF text (first 1500 chars):\n{}", extractedText.substring(0, Math.min(extractedText.length(), 1500)));
-
-            // Step 1: ALWAYS try regex first (instant — no network call)
             InvoiceParseResponse regexResult = regexParse(extractedText);
             if (regexResult.isSuccess()) {
-                // Accept regex result if we got at least vendor OR amount (previously required amount)
                 boolean hasUsefulData = regexResult.getTotalAmount() != null
                         || regexResult.getVendorName() != null
                         || regexResult.getInvoiceNumber() != null;
@@ -101,12 +81,9 @@ public class InvoiceParserService {
                     return regexResult;
                 }
             }
-
-            // Step 2: If regex failed/incomplete AND Ollama is available, try AI with TRUNCATED text
             if (ollamaClient.isAvailable()) {
                 log.info("Regex incomplete — trying AI-powered extraction (truncated text)...");
                 try {
-                    // Truncate text to speed up AI processing — only send relevant parts
                     String truncatedText = truncateForAi(extractedText, 1500);
                     InvoiceParseResponse aiResult = parseInvoice(truncatedText);
                     if (aiResult.isSuccess()) {
@@ -117,13 +94,9 @@ public class InvoiceParserService {
                     log.warn("AI extraction failed: {}", e.getMessage());
                 }
             }
-
-            // Step 3: Return whatever regex got (even partial) — better than nothing
             if (regexResult.isSuccess()) {
                 return regexResult;
             }
-
-            // Nothing worked
             log.warn("Both regex and AI could not extract enough data from PDF.");
             return InvoiceParseResponse.builder()
                     .success(false)
@@ -142,14 +115,8 @@ public class InvoiceParserService {
         }
     }
 
-    /**
-     * Truncate text intelligently for AI — keep the header/footer (where totals/vendor info usually is)
-     * and skip the middle (which is usually item details).
-     */
     private String truncateForAi(String text, int maxChars) {
         if (text.length() <= maxChars) return text;
-
-        // Keep first 60% (header, vendor, items) + last 40% (totals, payment info)
         int headerLen = (int) (maxChars * 0.6);
         int footerLen = maxChars - headerLen;
         String header = text.substring(0, headerLen);
@@ -157,9 +124,7 @@ public class InvoiceParserService {
         return header + "\n...[truncated]...\n" + footer;
     }
 
-    /** Send image to LLaVA vision model */
     private InvoiceParseResponse parseImage(String base64Image) {
-        // Check Ollama availability first to fail fast
         if (!ollamaClient.isAvailable()) {
             log.warn("Ollama is not reachable — cannot process image invoice");
             return InvoiceParseResponse.builder()
@@ -169,7 +134,6 @@ public class InvoiceParserService {
         }
 
         try {
-            // Compact vision prompt — fewer tokens = faster response from LLaVA
             String prompt = "Read this invoice/receipt. Reply with JSON only, no explanation.\n" +
                     "{\"title\":\"short title\",\"vendorName\":\"str\",\"invoiceNumber\":\"str\",\"invoiceDate\":\"YYYY-MM-DD\"," +
                     "\"totalAmount\":number,\"category\":\"TRAVEL|MEALS|ACCOMMODATION|OFFICE_SUPPLIES|EQUIPMENT|SOFTWARE|TRAINING|MEDICAL|TRANSPORTATION|OTHER\"," +
@@ -193,9 +157,6 @@ public class InvoiceParserService {
         }
     }
 
-    /**
-     * Parse invoice text using the text-only model (phi3).
-     */
     public InvoiceParseResponse parseInvoice(String invoiceText) {
         if (invoiceText == null || invoiceText.isBlank()) {
             return InvoiceParseResponse.builder()
@@ -230,7 +191,6 @@ public class InvoiceParserService {
     }
 
     private String buildExtractionPrompt(String invoiceText) {
-        // Compact prompt — fewer tokens = faster AI response
         return "Extract invoice data as JSON only. No explanation.\n" +
                "{\"title\":\"short title\",\"vendorName\":\"str\",\"invoiceNumber\":\"str\",\"invoiceDate\":\"YYYY-MM-DD\"," +
                "\"totalAmount\":number,\"category\":\"TRAVEL|MEALS|ACCOMMODATION|OFFICE_SUPPLIES|EQUIPMENT|SOFTWARE|TRAINING|MEDICAL|TRANSPORTATION|OTHER\"," +
@@ -240,7 +200,6 @@ public class InvoiceParserService {
 
     private InvoiceParseResponse parseAiResponse(String aiResponse, String rawText) {
         try {
-            // Try to extract JSON from the response
             String json = extractJson(aiResponse);
             log.info("Extracted JSON from AI response: {}", json.substring(0, Math.min(json.length(), 500)));
             JsonNode root = objectMapper.readTree(json);
@@ -255,8 +214,6 @@ public class InvoiceParserService {
                             .build());
                 }
             }
-
-            // Validate and normalize category
             String category = getTextOrNull(root, "category");
             if (category != null) {
                 category = category.toUpperCase().replace(" ", "_");
@@ -289,12 +246,6 @@ public class InvoiceParserService {
         }
     }
 
-    // ─── Regex-based Fallback Parser ───────────────────────────────────────
-
-    /**
-     * Regex-based parser: extracts invoice data using pattern matching (instant, no AI needed).
-     * Returns success=true even for partial data so the frontend auto-fills whatever was found.
-     */
     private InvoiceParseResponse regexParse(String text) {
         log.info("Running regex-based extraction on text ({} chars)", text.length());
 
@@ -304,8 +255,6 @@ public class InvoiceParserService {
         BigDecimal totalAmount = extractTotalAmount(text);
         String category = guessCategory(text);
         List<InvoiceParseResponse.ParsedItem> items = extractLineItems(text);
-
-        // Also try to extract order ID from filename-like patterns (ORDER_INVOICE_RD...)
         if (invoiceNumber == null) {
             Matcher orderMatcher = Pattern.compile("(?i)(?:ORDER[_\\s-]*(?:INVOICE)?[_\\s-]*)([A-Z0-9]{5,30})")
                     .matcher(text);
@@ -313,21 +262,13 @@ public class InvoiceParserService {
                 invoiceNumber = orderMatcher.group(1);
             }
         }
-
-        // If items found but no total, sum the items
         if (totalAmount == null && !items.isEmpty()) {
             totalAmount = items.stream()
                     .map(i -> i.getAmount() != null ? i.getAmount().multiply(BigDecimal.valueOf(i.getQuantity() != null ? i.getQuantity() : 1)) : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
-
-        // Generate a title
         String title = generateTitle(vendorName, category, totalAmount);
-
-        // Generate description from first few lines
         String description = generateDescription(text, vendorName);
-
-        // Count how many fields we found
         int fieldsFound = 0;
         if (vendorName != null) fieldsFound++;
         if (invoiceNumber != null) fieldsFound++;
@@ -337,8 +278,6 @@ public class InvoiceParserService {
 
         log.info("Regex extracted {} fields: vendor={}, invoice={}, date={}, amount={}, items={}",
                 fieldsFound, vendorName, invoiceNumber, invoiceDate, totalAmount, items.size());
-
-        // Return success if we found at least ONE useful field (was previously requiring multiple)
         if (fieldsFound == 0) {
             return InvoiceParseResponse.builder()
                     .success(false)
@@ -363,7 +302,6 @@ public class InvoiceParserService {
     }
 
     private String generateDescription(String text, String vendorName) {
-        // Extract meaningful first lines as description
         String[] lines = text.split("\\r?\\n");
         List<String> meaningful = new ArrayList<>();
         for (String line : lines) {
@@ -378,7 +316,6 @@ public class InvoiceParserService {
     }
 
     private String extractVendorName(String text) {
-        // ★ PRIORITY 1: Known Indian brands/platforms — check FIRST (instant, most reliable)
         String lower = text.toLowerCase();
         if (lower.contains("rapido")) return "Rapido";
         if (lower.contains("amazon")) return "Amazon";
@@ -407,13 +344,10 @@ public class InvoiceParserService {
         if (lower.contains("dominos") || lower.contains("domino's")) return "Dominos";
         if (lower.contains("mcdonald")) return "McDonald's";
         if (lower.contains("starbucks")) return "Starbucks";
-
-        // ★ PRIORITY 2: Explicit vendor label patterns (sold by, seller, vendor, etc.)
         String[] vendorPatterns = {
                 "(?i)(?:sold\\s*by|seller\\s*(?:name)?|vendor\\s*(?:name)?|bill\\s*from|billed?\\s*by|merchant)\\s*[:\\-]?\\s*([^\\r\\n]+)",
                 "(?i)(?:from|company|store|shop|restaurant|retailer)\\s*[:\\-]\\s*([^\\r\\n]+)"
         };
-        // NOTE: "issued by", "shipped by", "supplied by" removed — they often match disclaimers
 
         for (String pattern : vendorPatterns) {
             Matcher m = Pattern.compile(pattern).matcher(text);
@@ -422,7 +356,6 @@ public class InvoiceParserService {
                 name = name.split(",")[0].trim();
                 name = name.replaceAll("\\s*\\(.*\\)\\s*$", "").trim();
                 name = name.replaceAll("(?i)\\s*GST.*$", "").trim();
-                // Reject if it looks like a disclaimer sentence (too long or contains "not by", "limited")
                 if (!name.isEmpty() && name.length() >= 2 && name.length() < 60
                         && !name.toLowerCase().contains("not by")
                         && !name.toLowerCase().contains("private limited")
@@ -431,8 +364,6 @@ public class InvoiceParserService {
                 }
             }
         }
-
-        // ★ PRIORITY 3: First meaningful line (common in receipts — company name at top)
         String[] lines = text.split("\\r?\\n");
         for (String line : lines) {
             String trimmed = line.trim();
@@ -448,38 +379,26 @@ public class InvoiceParserService {
     }
 
     private String extractInvoiceNumber(String text) {
-        // ★ Strategy: Try multiple patterns in priority order.
-        //   PDFBox often interleaves two-column text (e.g., "Invoice No. Invoice Date...")
-        //   so we need multiple approaches to reliably find the invoice number.
 
         Set<String> rejected = Set.of("details", "date", "summary", "amount", "total",
                 "charge", "charges", "fee", "fees", "payment", "address", "name", "type",
                 "number", "invoice", "bill", "receipt", "tax", "order", "ride", "booking",
                 "category", "supply", "state", "using");
-
-        // ── Strategy 1: "Invoice No." directly followed by alphanumeric ID (starts with digit) ──
         Matcher m1 = Pattern.compile("(?i)invoice\\s+no\\.?\\s*[:\\-]?\\s*([0-9][A-Za-z0-9]{4,49})").matcher(text);
         while (m1.find()) {
             String num = m1.group(1).trim();
             if (isValidInvoiceNumber(num, rejected)) return num;
         }
-
-        // ── Strategy 2: Ride ID / Order ID / Booking ID ──
         Matcher m2 = Pattern.compile("(?i)(?:ride|order|booking|txn)\\s*id\\s*[:\\-]?\\s*([A-Za-z0-9\\-/.]{5,50})").matcher(text);
         while (m2.find()) {
             String num = m2.group(1).trim();
             if (isValidInvoiceNumber(num, rejected)) return num;
         }
-
-        // ── Strategy 3: Generic "Bill/Receipt/Ref No." ──
         Matcher m3 = Pattern.compile("(?i)(?:bill|receipt|ref|reference|txn)\\s*(?:no|number|num|#|id)\\.?\\s*[:\\-]?\\s*([A-Za-z0-9\\-/]{3,50})").matcher(text);
         while (m3.find()) {
             String num = m3.group(1).trim();
             if (isValidInvoiceNumber(num, rejected)) return num;
         }
-
-        // ── Strategy 4: Standalone alphanumeric IDs (e.g., "2526TN0091646633" — digits + uppercase) ──
-        //   Common for Indian invoice numbers: starts with digits, contains uppercase letters
         Matcher m4 = Pattern.compile("(?m)^\\s*([0-9]{2,}[A-Z]+[A-Z0-9]{3,})\\s*$").matcher(text);
         while (m4.find()) {
             String num = m4.group(1).trim();
@@ -497,21 +416,13 @@ public class InvoiceParserService {
     }
 
     private String extractDate(String text) {
-        // ★ FIX: Support ordinal suffixes (1st, 2nd, 3rd, 25th) in date patterns
-        //   e.g., "Feb 25th 2026" or "25th Feb 2026"
-
-        // Look near date keywords first (expand search to 80 chars for multi-word dates)
         String dateContext = text;
         Matcher dateLine = Pattern.compile("(?i)(?:date|dated|invoice\\s*date|bill\\s*date|order\\s*date|time\\s*of\\s*ride)[:\\s]*(.{0,80})").matcher(text);
         if (dateLine.find()) {
             dateContext = dateLine.group(1);
         }
-
-        // Try to extract from the dateContext first, then fall back to full text
         String result = tryExtractDate(dateContext);
         if (result != null) return result;
-
-        // If dateContext was a subset, try the full text
         if (!dateContext.equals(text)) {
             result = tryExtractDate(text);
         }
@@ -519,7 +430,6 @@ public class InvoiceParserService {
     }
 
     private String tryExtractDate(String text) {
-        // ── Pattern 1: "Month DDth YYYY" e.g., "Feb 25th 2026", "January 1st 2026" ──
         Matcher mOrd1 = Pattern.compile(
                 "(?i)(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+(\\d{1,2})(?:st|nd|rd|th)?[,]?\\s+(\\d{4})"
         ).matcher(text);
@@ -533,8 +443,6 @@ public class InvoiceParserService {
                 }
             } catch (Exception ignored) {}
         }
-
-        // ── Pattern 2: "DDth Month YYYY" e.g., "25th Feb 2026" ──
         Matcher mOrd2 = Pattern.compile(
                 "(?i)(\\d{1,2})(?:st|nd|rd|th)?\\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[,]?\\s+(\\d{4})"
         ).matcher(text);
@@ -548,8 +456,6 @@ public class InvoiceParserService {
                 }
             } catch (Exception ignored) {}
         }
-
-        // ── Pattern 3: DD-MM-YYYY or DD/MM/YYYY ──
         Matcher m1 = Pattern.compile("(\\d{1,2})[/\\-](\\d{1,2})[/\\-](\\d{4})").matcher(text);
         if (m1.find()) {
             try {
@@ -563,8 +469,6 @@ public class InvoiceParserService {
                 }
             } catch (Exception ignored) {}
         }
-
-        // ── Pattern 4: YYYY-MM-DD ──
         Matcher m2 = Pattern.compile("(\\d{4})[/\\-](\\d{1,2})[/\\-](\\d{1,2})").matcher(text);
         if (m2.find()) {
             int year = Integer.parseInt(m2.group(1));
@@ -586,41 +490,25 @@ public class InvoiceParserService {
     }
 
     private BigDecimal extractTotalAmount(String text) {
-        // ★ KEY FIX: Use short gaps (max 20 chars) between keyword and number to avoid
-        //   matching addresses like "583/1A" when "amount" appears far away in the text.
-        //   Also validate: skip numbers followed by "/" (addresses) or 6-digit pincodes.
-
-        // Tier 1: Most specific "total" labels — short gap, require currency or decimal
         String[] tier1Patterns = {
                 "(?i)(?:grand\\s*total|total\\s*amount|total\\s*payable|order\\s*total|invoice\\s*total|bill\\s*total|final\\s*amount|you\\s*pay)[^\\d₹]{0,20}(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.\\d{2})",
                 "(?i)(?:grand\\s*total|total\\s*amount|total\\s*payable|order\\s*total|invoice\\s*total|bill\\s*total|final\\s*amount|you\\s*pay)[^\\d₹]{0,20}([\\d,]+\\.\\d{2})",
         };
-
-        // Tier 2: "Total" at start of line with currency symbol
         String[] tier2Patterns = {
                 "(?i)(?:^|\\n)\\s*total[^\\d₹]{0,15}(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.\\d{2})",
                 "(?i)(?:^|\\n)\\s*total[^\\d₹]{0,15}([\\d,]+\\.\\d{2})",
         };
-
-        // Tier 3: Currency symbol followed by amount (₹ 29.00)
         String tier3Pattern = "(?:₹|Rs\\.?)\\s*([\\d,]+\\.\\d{2})";
-
-        // Try Tier 1 — take the MAX among specific "total" matches
         BigDecimal best = findBestAmount(text, tier1Patterns);
         if (best != null) return best;
-
-        // Try Tier 2 — "Total" on its own line
         best = findBestAmount(text, tier2Patterns);
         if (best != null) return best;
-
-        // Try Tier 3 — all currency-prefixed amounts, take the MAX
         BigDecimal maxAmount = null;
         Matcher m3 = Pattern.compile(tier3Pattern).matcher(text);
         while (m3.find()) {
             try {
                 BigDecimal amt = parseAmount(m3.group(1));
                 if (amt != null && isReasonableAmount(amt)) {
-                    // Skip if this number is followed by "/" (address like 583/1A)
                     int endPos = m3.end();
                     if (endPos < text.length() && text.charAt(endPos) == '/') continue;
                     if (maxAmount == null || amt.compareTo(maxAmount) > 0) {
@@ -633,7 +521,6 @@ public class InvoiceParserService {
         return maxAmount;
     }
 
-    /** Find the best (largest) amount from an array of regex patterns */
     private BigDecimal findBestAmount(String text, String[] patterns) {
         BigDecimal best = null;
         for (String pattern : patterns) {
@@ -642,7 +529,6 @@ public class InvoiceParserService {
                 try {
                     BigDecimal amt = parseAmount(m.group(1));
                     if (amt != null && isReasonableAmount(amt)) {
-                        // Skip if number is followed by "/" (address like 583/1A)
                         int endPos = m.end();
                         if (endPos < text.length() && text.charAt(endPos) == '/') continue;
                         if (best == null || amt.compareTo(best) > 0) {
@@ -668,7 +554,6 @@ public class InvoiceParserService {
     }
 
     private boolean isReasonableAmount(BigDecimal amt) {
-        // Must be positive and less than 10 lakh (₹10,00,000) — skip pincodes like 641035
         return amt.compareTo(BigDecimal.ZERO) > 0 && amt.compareTo(new BigDecimal("1000000")) < 0;
     }
 
@@ -711,9 +596,6 @@ public class InvoiceParserService {
     private List<InvoiceParseResponse.ParsedItem> extractLineItems(String text) {
         List<InvoiceParseResponse.ParsedItem> items = new ArrayList<>();
         Set<String> seenDescs = new HashSet<>();
-
-        // ★ Exclusion: tax lines, addresses, pincodes, payment info, metadata
-        // NOTE: "ride charge" and "booking fee" are REAL bill items — do NOT exclude them!
         Pattern exclusionPattern = Pattern.compile(
                 "(?i)(?:^total$|total\\s*amount|total\\s*payable|grand\\s*total|final\\s*amount|" +
                 "sub\\s*total|subtotal|sub-total|^total\\s*₹|" +
@@ -725,22 +607,12 @@ public class InvoiceParserService {
                 "pin\\s*code|state\\s|invoice\\s*date|invoice\\s*no|ride\\s*id|time\\s*of|" +
                 "qr\\s*pay|upi|wallet|passengers\\s*n\\.?e\\.?c|n\\.?e\\.?c\\.?|" +
                 "duration|distance|kms|mins|minutes|kilometers)");
-
-        // ★ FIX: Skip descriptions that start with currency symbols (₹5.48, Rs.100)
         Pattern currencyDescPattern = Pattern.compile("^(?:₹|Rs\\.?|INR)\\s*\\d");
-
-        // ★ FIX: Skip descriptions that look like pincodes or numbers only
         Pattern numericDescPattern = Pattern.compile("^[\\d\\s.,₹/]+$");
-
-        // Patterns for line items (description + amount on same line)
         String[] itemPatterns = {
-                // 1. "Ride Charge ₹ 23.52" — description followed by ₹ amount (1+ space is enough)
                 "(?m)^\\s*(?:\\d+[.)]?\\s+)?(.{4,80})\\s+(?:₹|Rs\\.?|INR)\\s*([\\d,]+\\.\\d{2})\\s*$",
-                // 2. "Item description  150.00" — no currency, requires 2+ spaces + decimal
                 "(?m)^\\s*(?:\\d+[.)]?\\s+)?(.{5,70})\\s{2,}([\\d,]+\\.\\d{2})\\s*$",
-                // 3. Numbered: "1  Item description  2  ₹150.00"
                 "(?m)^\\s*\\d+[.)]?\\s+(.{3,80})\\s+(\\d+)\\s+(?:₹|Rs\\.?|INR)?\\s*([\\d,]+\\.\\d{2})\\s*$",
-                // 4. "Item Name  Qty  Rate  Amount" — last number is amount
                 "(?m)^\\s*(?:\\d+[.)]?\\s+)?(.{3,60})\\s+(\\d+)\\s+[\\d,.]+\\s+(?:₹|Rs\\.?|INR)?\\s*([\\d,]+\\.\\d{0,2})\\s*$"
         };
 
@@ -749,18 +621,12 @@ public class InvoiceParserService {
             while (m.find() && items.size() < 20) {
                 try {
                     String desc = m.group(1).trim();
-
-                    // ★ Skip exclusions
                     if (exclusionPattern.matcher(desc).find()) continue;
                     if (currencyDescPattern.matcher(desc).find()) continue;
                     if (numericDescPattern.matcher(desc).matches()) continue;
                     if (desc.length() < 3 || seenDescs.contains(desc.toLowerCase())) continue;
-
-                    // Skip header-like lines (but NOT item descriptions containing "charge" or "fee")
                     if (desc.matches("(?i).*(?:description|item\\s*name|particulars|s\\.?\\s*no|qty|quantity|^rate$|^price$|^amount$|hsn|sac|bill\\s*details|payment\\s*summary).*"))
                         continue;
-
-                    // Skip if description is just a number/pincode (641035, 996419)
                     if (desc.matches("^\\d{4,}.*")) continue;
 
                     int qty = 1;
@@ -807,10 +673,7 @@ public class InvoiceParserService {
         return "Expense";
     }
 
-    // ─── Helpers ───────────────────────────────────────────────────────────
-
     private String extractJson(String text) {
-        // Find the first { and last } to extract JSON
         int start = text.indexOf('{');
         int end = text.lastIndexOf('}');
         if (start >= 0 && end > start) {
@@ -832,7 +695,6 @@ public class InvoiceParserService {
             if (node.get(field).isNumber()) {
                 return node.get(field).decimalValue();
             }
-            // Try parsing string as number
             try {
                 String val = node.get(field).asText().replaceAll("[^\\d.]", "");
                 if (!val.isEmpty()) {

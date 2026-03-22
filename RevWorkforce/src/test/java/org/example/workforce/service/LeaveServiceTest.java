@@ -193,15 +193,11 @@ class LeaveServiceTest {
 
         leaveBalance.setTotalLeaves(5);
         leaveBalance.setUsedLeaves(3);
-        // Available balance = 5 - 3 = 2 days
-        // Set dates to ensure we get at least 3 working days (more than available)
         LocalDate startDate = LocalDate.now().plusDays(1);
-        // Skip weekends to ensure we get working days
         while (startDate.getDayOfWeek().getValue() > 5) {
             startDate = startDate.plusDays(1);
         }
         leaveApplyRequest.setStartDate(startDate);
-        // Set end date to get at least 3 working days (Monday to Wednesday = 3 days)
         LocalDate endDate = startDate;
         int workingDays = 0;
         while (workingDays < 3) {
@@ -213,7 +209,7 @@ class LeaveServiceTest {
             }
         }
         leaveApplyRequest.setEndDate(endDate);
-        
+
         when(employeeRepository.findByEmail("employee@test.com")).thenReturn(Optional.of(employee));
         when(leaveTypeRepository.findById(1)).thenReturn(Optional.of(leaveType));
         when(leaveApplicationRepository.findOverlappingLeaves(anyInt(), any(), any(), any(), any()))
@@ -351,7 +347,7 @@ class LeaveServiceTest {
                 .totalDays(3)
                 .status(LeaveStatus.APPROVED)
                 .build();
-        
+
         when(employeeRepository.findByEmail("employee@test.com")).thenReturn(Optional.of(employee));
         when(leaveApplicationRepository.findById(1)).thenReturn(Optional.of(leave));
         when(leaveBalanceRepository.findByEmployee_EmployeeIdAndLeaveType_LeaveTypeIdAndYear(

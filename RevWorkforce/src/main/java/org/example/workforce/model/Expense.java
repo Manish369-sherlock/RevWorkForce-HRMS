@@ -77,8 +77,6 @@ public class Expense {
     @Column(nullable = false, length = 25)
     @Builder.Default
     private ExpenseStatus status = ExpenseStatus.DRAFT;
-
-    // Manager approval
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "actioned_by")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -89,8 +87,6 @@ public class Expense {
 
     @Column(name = "manager_action_date")
     private LocalDateTime managerActionDate;
-
-    // Finance approval
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "finance_actioned_by")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -110,8 +106,6 @@ public class Expense {
 
     @Column(name = "reimbursed_date")
     private LocalDateTime reimbursedDate;
-
-    // AI-parsed fields stored for audit
     @Column(name = "ai_parsed", columnDefinition = "TEXT")
     private String aiParsedData;
 
@@ -126,8 +120,6 @@ public class Expense {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    // Helper method
     public void addItem(ExpenseItem item) {
         items.add(item);
         item.setExpense(this);

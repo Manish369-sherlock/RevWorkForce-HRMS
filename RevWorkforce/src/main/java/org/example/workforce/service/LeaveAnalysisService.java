@@ -18,10 +18,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * AI-powered leave analysis for managers/admins reviewing leave requests.
- * Provides historical patterns, team impact analysis, and AI recommendations.
- */
 @Service
 public class LeaveAnalysisService {
 
@@ -38,8 +34,6 @@ public class LeaveAnalysisService {
         Employee employee = request.getEmployee();
         LocalDate today = LocalDate.now();
         int currentYear = today.getYear();
-
-        // ─── Fetch all leave history ───
         List<LeaveApplication> allLeaves = leaveApplicationRepository
                 .findByEmployeeEmployeeId(employee.getEmployeeId().intValue());
 
@@ -52,44 +46,30 @@ public class LeaveAnalysisService {
                 .filter(l -> l.getStartDate().getYear() == currentYear - 1)
                 .filter(l -> l.getStatus() == LeaveStatus.APPROVED)
                 .toList();
-
-        // ─── Leave stats by type ───
         Map<String, Integer> leavesByType = thisYearLeaves.stream()
                 .filter(l -> l.getStatus() == LeaveStatus.APPROVED)
                 .collect(Collectors.groupingBy(
                         l -> l.getLeaveType().getLeaveTypeName(),
                         Collectors.summingInt(LeaveApplication::getTotalDays)));
-
-        // ─── Leave stats by month ───
         Map<String, Integer> leavesByMonth = thisYearLeaves.stream()
                 .filter(l -> l.getStatus() == LeaveStatus.APPROVED)
                 .collect(Collectors.groupingBy(
                         l -> l.getStartDate().getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
                         Collectors.summingInt(LeaveApplication::getTotalDays)));
-
-        // ─── Average leave duration ───
         double avgDuration = thisYearLeaves.stream()
                 .filter(l -> l.getStatus() == LeaveStatus.APPROVED)
                 .mapToInt(LeaveApplication::getTotalDays)
                 .average().orElse(0);
-
-        // ─── Current balances ───
         List<LeaveBalance> balances = leaveBalanceRepository
                 .findByEmployee_EmployeeIdAndYear(employee.getEmployeeId(), currentYear);
         Map<String, Integer> currentBalances = balances.stream()
                 .collect(Collectors.toMap(
                         b -> b.getLeaveType().getLeaveTypeName(),
                         LeaveBalance::getAvailableBalance));
-
-        // ─── Balance after approval ───
         String requestedType = request.getLeaveType().getLeaveTypeName();
         int currentBalance = currentBalances.getOrDefault(requestedType, 0);
         int balanceAfterApproval = currentBalance - request.getTotalDays();
-
-        // ─── Pattern detection ───
         List<String> patterns = detectPatterns(thisYearLeaves);
-
-        // ─── Frequency trend ───
         int thisYearCount = thisYearLeaves.stream()
                 .filter(l -> l.getStatus() == LeaveStatus.APPROVED)
                 .mapToInt(LeaveApplication::getTotalDays).sum();
@@ -97,19 +77,13 @@ public class LeaveAnalysisService {
                 .mapToInt(LeaveApplication::getTotalDays).sum();
         String trend = thisYearCount > lastYearCount * 1.2 ? "INCREASING" :
                 thisYearCount < lastYearCount * 0.8 ? "DECREASING" : "STABLE";
-
-        // ─── Team members on leave today ───
         int teamOnLeave = 0;
         if (employee.getManager() != null) {
             teamOnLeave = countTeamMembersOnLeave(employee.getManager().getEmployeeId(), today);
         }
-
-        // ─── Pending requests count ───
         long pendingCount = allLeaves.stream()
                 .filter(l -> l.getStatus() == LeaveStatus.PENDING)
                 .count();
-
-        // ─── Build response ───
         LeaveAnalysisResponse response = LeaveAnalysisResponse.builder()
                 .employeeName(employee.getFirstName() + " " + employee.getLastName())
                 .department(employee.getDepartment() != null ? employee.getDepartment().getDepartmentName() : "N/A")
@@ -128,8 +102,6 @@ public class LeaveAnalysisService {
                 .requestedType(requestedType)
                 .balanceAfterApproval(balanceAfterApproval)
                 .build();
-
-        // ─── AI Analysis ───
         generateAiAnalysis(response, request);
 
         return response;
@@ -144,8 +116,6 @@ public class LeaveAnalysisService {
             patterns.add("No approved leave history this year");
             return patterns;
         }
-
-        // Monday/Friday pattern
         long mondayFriday = approved.stream()
                 .filter(l -> {
                     DayOfWeek dow = l.getStartDate().getDayOfWeek();
@@ -154,14 +124,10 @@ public class LeaveAnalysisService {
         if (mondayFriday > approved.size() * 0.5 && approved.size() >= 3) {
             patterns.add("Frequently takes leave on Mondays/Fridays (" + mondayFriday + "/" + approved.size() + " requests)");
         }
-
-        // Consecutive short leaves
         long singleDays = approved.stream().filter(l -> l.getTotalDays() == 1).count();
         if (singleDays > 3) {
             patterns.add("Takes many single-day leaves (" + singleDays + " this year)");
         }
-
-        // Monthly clustering
         Map<Integer, Long> byMonth = approved.stream()
                 .collect(Collectors.groupingBy(l -> l.getStartDate().getMonthValue(), Collectors.counting()));
         byMonth.entrySet().stream()
@@ -177,12 +143,10 @@ public class LeaveAnalysisService {
     }
 
     private int countTeamMembersOnLeave(Integer managerId, LocalDate date) {
-        // Single efficient DB query instead of loading all leaves
         return leaveApplicationRepository.countTeamOnLeave(managerId, LeaveStatus.APPROVED, date);
     }
 
     private void generateAiAnalysis(LeaveAnalysisResponse response, LeaveApplication request) {
-        // Check Ollama availability before attempting — avoids long timeouts
         if (!ollamaClient.isAvailable()) {
             log.info("Ollama not available — using data-driven analysis fallback");
             setDefaultAnalysis(response);
@@ -209,7 +173,6 @@ public class LeaveAnalysisService {
             String aiResponse = ollamaClient.generate(prompt, 150);
 
             if (aiResponse != null && !aiResponse.startsWith("Error")) {
-                // Parse structured response
                 String summary = extractField(aiResponse, "SUMMARY:");
                 String recommendation = extractField(aiResponse, "RECOMMENDATION:");
                 String reasons = extractField(aiResponse, "REASONS:");
@@ -229,21 +192,16 @@ public class LeaveAnalysisService {
     }
 
     private void setDefaultAnalysis(LeaveAnalysisResponse response) {
-        // Generate a meaningful data-driven analysis even without Ollama
         List<String> reasons = new ArrayList<>();
         StringBuilder summary = new StringBuilder();
 
         boolean recommend = true;
-
-        // 1. Balance check
         if (response.getBalanceAfterApproval() >= 0) {
             reasons.add("Sufficient leave balance (" + (response.getBalanceAfterApproval() + response.getRequestedDays()) + " available, " + response.getBalanceAfterApproval() + " remaining after)");
         } else {
             recommend = false;
             reasons.add("Insufficient leave balance (would be " + response.getBalanceAfterApproval() + " after approval)");
         }
-
-        // 2. Team impact
         if (response.getTeamMembersOnLeaveToday() >= 3) {
             recommend = false;
             reasons.add("High team absence — " + response.getTeamMembersOnLeaveToday() + " team members already on leave today");
@@ -252,27 +210,19 @@ public class LeaveAnalysisService {
         } else {
             reasons.add("No team members currently on leave — minimal team impact");
         }
-
-        // 3. Frequency trend
         if ("INCREASING".equals(response.getFrequencyTrend()) && response.getTotalLeavesTakenThisYear() > 10) {
             reasons.add("Leave frequency is increasing compared to last year (" + response.getTotalLeavesTakenThisYear() + " vs " + response.getTotalLeavesTakenLastYear() + " days)");
         } else if ("STABLE".equals(response.getFrequencyTrend()) || "DECREASING".equals(response.getFrequencyTrend())) {
             reasons.add("Leave usage trend is " + response.getFrequencyTrend().toLowerCase() + " compared to last year");
         }
-
-        // 4. Patterns
         boolean hasWarningPattern = response.getPatterns() != null &&
                 response.getPatterns().stream().anyMatch(p -> p.contains("Frequently") || p.contains("High leave frequency"));
         if (hasWarningPattern) {
             reasons.add("Some leave patterns detected — review patterns section for details");
         }
-
-        // 5. Pending count
         if (response.getPendingLeaveRequests() > 3) {
             reasons.add(response.getPendingLeaveRequests() + " pending leave requests — consider reviewing all together");
         }
-
-        // Build summary
         summary.append(response.getEmployeeName()).append(" (").append(response.getDepartment()).append(") ")
                 .append("is requesting ").append(response.getRequestedDays()).append(" day(s) of ").append(response.getRequestedType()).append(". ");
 

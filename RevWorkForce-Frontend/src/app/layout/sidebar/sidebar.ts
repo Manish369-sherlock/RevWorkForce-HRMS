@@ -24,7 +24,7 @@ export class sidebar implements OnInit, OnDestroy {
     chatUnreadCount = signal(0);
     private chatUnreadDebounce: any = null;
     private subs: Subscription[] = [];
-    
+
     constructor(
         private authService: AuthService,
         private chatService: ChatService,

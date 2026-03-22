@@ -12,7 +12,7 @@ export class EmployeeService{
     private readonly desigUrl = `${environment.apiUrl}/admin/designations`;
     constructor(private http: HttpClient){}
     getEmployees(
-        keyword?: string, departmentId?: number, role?: string, active?: boolean, page=0, size=12, sortBy = 'employeeId', direction = 'asc' 
+        keyword?: string, departmentId?: number, role?: string, active?: boolean, page=0, size=12, sortBy = 'employeeId', direction = 'asc'
     ): Observable<ApiResponse<PageResponse<EmployeeProfile>>>{
         let params = new HttpParams().set('page', page.toString()).set('size', size.toString()).set('sortBy', sortBy).set('direction', direction);
         if(keyword) params = params.set('keyword', keyword);

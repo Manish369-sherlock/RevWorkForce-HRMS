@@ -296,7 +296,7 @@ export interface TeamLeaveCalendarEntry {
 }
 
 export interface ManagerFeedbackRequest {
-    managerRating: number; 
+    managerRating: number;
     managerFeedback: string;
 }
 

@@ -122,20 +122,3 @@ class AdminDepartmentControllerTest {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

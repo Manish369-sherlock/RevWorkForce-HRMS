@@ -6,10 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * AI Performance Report Generator endpoint.
- * Available to managers and admins.
- */
 @RestController
 @RequestMapping("/api/admin/reports")
 public class ReportGeneratorController {

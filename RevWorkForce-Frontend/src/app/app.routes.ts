@@ -13,7 +13,7 @@ export const routes: Routes = [
         canActivate: [authGuard],
         children: [
             {
-                path: 'admin/dashboard', 
+                path: 'admin/dashboard',
                 loadComponent: () => import('./pages/admin/dashboard/dashboard').then(m => m.Dashboard),
                 canActivate: [authGuard, roleGuard(Role.ADMIN)]
             },
@@ -143,9 +143,19 @@ export const routes: Routes = [
                 canActivate: [authGuard, roleGuard(Role.EMPLOYEE)]
             },
             {
+                path: 'manager/directory',
+                loadComponent: () => import('./pages/employee/directory/employee-directory').then(m => m.EmployeeDirectory),
+                canActivate: [authGuard, roleGuard(Role.MANAGER)]
+            },
+            {
                 path: 'employee/announcements',
                 loadComponent: () => import('./pages/employee/announcements/employee-announcements').then(m => m.EmployeeAnnouncements),
                 canActivate: [authGuard, roleGuard(Role.EMPLOYEE)]
+            },
+            {
+                path: 'manager/announcements',
+                loadComponent: () => import('./pages/employee/announcements/employee-announcements').then(m => m.EmployeeAnnouncements),
+                canActivate: [authGuard, roleGuard(Role.MANAGER)]
             },
             {
                 path: 'employee/my-expenses',

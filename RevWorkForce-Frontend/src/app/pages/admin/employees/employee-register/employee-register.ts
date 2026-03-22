@@ -28,13 +28,13 @@ export class EmployeeRegister implements OnInit {
         this.initForm();
         this.loadDropdowns();
         this.loadManagers();
-        
+
         const initialRole = this.form.get('role')?.value;
         if (initialRole === 'EMPLOYEE') {
             this.form.get('managerCode')?.setValidators([Validators.required]);
             this.form.get('managerCode')?.updateValueAndValidity();
         }
-        
+
         this.form.get('role')?.valueChanges.subscribe(role => {
             const managerControl = this.form.get('managerCode');
             if (role === 'EMPLOYEE') {
@@ -64,7 +64,7 @@ export class EmployeeRegister implements OnInit {
             designationId: [''],
             joiningDate: ['', [Validators.required]],
             salary: [''],
-            managerCode: [''], 
+            managerCode: [''],
         });
     }
     private loadDropdowns(): void {

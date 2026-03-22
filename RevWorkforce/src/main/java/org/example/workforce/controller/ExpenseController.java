@@ -17,11 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Employee Expense endpoints.
- * Employees can create, submit, and view their own expenses.
- * Also provides AI-powered invoice parsing.
- */
 @RestController
 @RequestMapping("/api/employee/expenses")
 public class ExpenseController {
@@ -30,20 +25,14 @@ public class ExpenseController {
 
     @Autowired private ExpenseService expenseService;
     @Autowired private InvoiceParserService invoiceParserService;
-
-    // Create a draft expense
     @PostMapping
     public ResponseEntity<Expense> createExpense(Authentication auth, @RequestBody ExpenseRequest request) {
         return ResponseEntity.ok(expenseService.createExpense(auth.getName(), request));
     }
-
-    // Submit expense for approval
     @PatchMapping("/{id}/submit")
     public ResponseEntity<Expense> submitExpense(Authentication auth, @PathVariable Integer id) {
         return ResponseEntity.ok(expenseService.submitExpense(auth.getName(), id));
     }
-
-    // Get my expenses
     @GetMapping
     public ResponseEntity<Page<Expense>> getMyExpenses(
             Authentication auth,
@@ -52,8 +41,6 @@ public class ExpenseController {
         return ResponseEntity.ok(expenseService.getMyExpenses(auth.getName(),
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))));
     }
-
-    // Get single expense
     @GetMapping("/{id}")
     public ResponseEntity<Expense> getExpense(@PathVariable Integer id) {
         return ResponseEntity.ok(expenseService.getExpenseById(id));
@@ -67,16 +54,12 @@ public class ExpenseController {
                 .contentType(MediaType.parseMediaType(receipt.contentType()))
                 .body(receipt.resource());
     }
-
-    // AI: Parse invoice text
     @PostMapping("/parse-invoice")
     public ResponseEntity<InvoiceParseResponse> parseInvoice(@RequestBody java.util.Map<String, String> body) {
         log.info("=== PARSE-INVOICE endpoint called ===");
         String invoiceText = body.get("invoiceText");
         return ResponseEntity.ok(invoiceParserService.parseInvoice(invoiceText));
     }
-
-    // AI: Parse uploaded file (image or PDF)
     @PostMapping("/parse-file")
     public ResponseEntity<InvoiceParseResponse> parseFile(@RequestBody java.util.Map<String, String> body) {
         log.info("=== PARSE-FILE endpoint called === fileType={}, dataLength={}",

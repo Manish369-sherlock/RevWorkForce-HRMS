@@ -38,8 +38,6 @@ public class ExpenseService {
     @Autowired private NotificationService notificationService;
     @Value("${expense.receipts.dir:uploads/expense-receipts}")
     private String expenseReceiptsDir;
-
-    // ─── Employee: Create Expense ───
     @Transactional
     public Expense createExpense(String email, ExpenseRequest request) {
         Employee employee = employeeService.getEmployeeByEmail(email);
@@ -57,8 +55,6 @@ public class ExpenseService {
                 .receiptFileName(request.getReceiptFileName())
                 .status(ExpenseStatus.DRAFT)
                 .build();
-
-        // Add line items if provided
         if (request.getItems() != null) {
             for (ExpenseRequest.ExpenseItemRequest itemReq : request.getItems()) {
                 ExpenseItem item = ExpenseItem.builder()
@@ -82,8 +78,6 @@ public class ExpenseService {
         initializeExpenseAssociations(saved);
         return saved;
     }
-
-    // ─── Employee: Submit Expense for approval ───
     @Transactional
     public Expense submitExpense(String email, Integer expenseId) {
         Employee employee = employeeService.getEmployeeByEmail(email);
@@ -97,8 +91,6 @@ public class ExpenseService {
         expense.setStatus(ExpenseStatus.SUBMITTED);
         expense.setSubmittedDate(LocalDateTime.now());
         Expense saved = expenseRepository.save(expense);
-
-        // Notify manager
         if (employee.getManager() != null) {
             notificationService.sendNotification(
                     employee.getManager(), "Expense Submitted",
@@ -110,8 +102,6 @@ public class ExpenseService {
         initializeExpenseAssociations(saved);
         return saved;
     }
-
-    // ─── Employee: My Expenses ───
     @Transactional(readOnly = true)
     public Page<Expense> getMyExpenses(String email, Pageable pageable) {
         Employee employee = employeeService.getEmployeeByEmail(email);
@@ -119,8 +109,6 @@ public class ExpenseService {
         page.getContent().forEach(this::initializeExpenseAssociations);
         return page;
     }
-
-    // ─── Manager: Team Expenses pending approval ───
     @Transactional(readOnly = true)
     public Page<Expense> getTeamExpenses(String email, Pageable pageable) {
         Employee manager = employeeService.getEmployeeByEmail(email);
@@ -153,8 +141,6 @@ public class ExpenseService {
         page.getContent().forEach(this::initializeExpenseAssociations);
         return page;
     }
-
-    // ─── Manager: Approve/Reject Expense ───
     @Transactional
     public Expense managerAction(String email, Integer expenseId, ExpenseActionRequest request) {
         Employee manager = employeeService.getEmployeeByEmail(email);
@@ -163,8 +149,6 @@ public class ExpenseService {
         if (expense.getStatus() != ExpenseStatus.SUBMITTED) {
             throw new BadRequestException("This expense is not pending manager approval.");
         }
-
-        // Verify the manager manages this employee OR is an ADMIN/MANAGER role with access
         Employee expenseOwner = expense.getEmployee();
         if (expenseOwner.getManager() == null ||
                 !expenseOwner.getManager().getEmployeeId().equals(manager.getEmployeeId())) {
@@ -199,8 +183,6 @@ public class ExpenseService {
         initializeExpenseAssociations(saved);
         return saved;
     }
-
-    // ─── Finance/Admin: Expenses pending finance action (approved by manager or awaiting reimbursement) ───
     @Transactional(readOnly = true)
     public Page<Expense> getFinancePendingExpenses(Pageable pageable) {
         Page<Expense> page = expenseRepository.findByStatusIn(
@@ -208,8 +190,6 @@ public class ExpenseService {
         page.getContent().forEach(this::initializeExpenseAssociations);
         return page;
     }
-
-    // ─── Finance/Admin: All expenses ───
     @Transactional(readOnly = true)
     public Page<Expense> getAllExpenses(ExpenseStatus status, Pageable pageable) {
         Page<Expense> page;
@@ -221,8 +201,6 @@ public class ExpenseService {
         page.getContent().forEach(this::initializeExpenseAssociations);
         return page;
     }
-
-    // ─── Finance: Approve/Reject/Reimburse ───
     @Transactional
     public Expense financeAction(String email, Integer expenseId, ExpenseActionRequest request) {
         Employee financeUser = employeeService.getEmployeeByEmail(email);
@@ -271,8 +249,6 @@ public class ExpenseService {
         initializeExpenseAssociations(saved);
         return saved;
     }
-
-    // ─── Helpers ───
     @Transactional(readOnly = true)
     public Expense getExpenseById(Integer id) {
         Expense expense = expenseRepository.findById(id)

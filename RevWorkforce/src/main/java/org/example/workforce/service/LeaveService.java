@@ -116,8 +116,6 @@ public class LeaveService {
         if (leave.getStatus() != LeaveStatus.PENDING && leave.getStatus() != LeaveStatus.APPROVED) {
             throw new InvalidActionException("Only pending or approved leaves can be cancelled. Current status: " + leave.getStatus());
         }
-
-        // If the leave was APPROVED, restore the leave balance
         if (leave.getStatus() == LeaveStatus.APPROVED) {
             int year = leave.getStartDate().getYear();
             leaveBalanceRepository.findByEmployee_EmployeeIdAndLeaveType_LeaveTypeIdAndYear(

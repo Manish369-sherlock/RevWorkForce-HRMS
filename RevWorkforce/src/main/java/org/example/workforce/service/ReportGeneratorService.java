@@ -20,11 +20,6 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * AI-powered performance report generator.
- * Aggregates goals, reviews, attendance, and leave data to produce
- * comprehensive performance assessments with AI-generated insights.
- */
 @Service
 public class ReportGeneratorService {
 
@@ -37,19 +32,11 @@ public class ReportGeneratorService {
     @Autowired private PerformanceReviewRepository performanceReviewRepository;
     @Autowired private OllamaClient ollamaClient;
 
-    /**
-     * Generate a comprehensive AI-powered performance report for an employee.
-     *
-     * @param employeeId The employee to generate the report for
-     * @param period     Optional period string (e.g., "Q1 2026", "2025-2026")
-     */
     public PerformanceReportResponse generateReport(Integer employeeId, String period) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
         int currentYear = LocalDate.now().getYear();
         String reportPeriod = period != null ? period : "FY " + currentYear;
-
-        // ─── Goals ───
         List<Goal> goals = goalRepository.findByEmployeeEmployeeIdAndYear(employee.getEmployeeId(), currentYear);
 
         int completedGoals = (int) goals.stream().filter(g -> g.getStatus() == GoalStatus.COMPLETED).count();
@@ -64,8 +51,6 @@ public class ReportGeneratorService {
                         .priority(g.getPriority().name())
                         .build())
                 .toList();
-
-        // ─── Performance Reviews ───
         List<PerformanceReview> reviews = performanceReviewRepository
                 .findByEmployeeEmployeeId(employee.getEmployeeId());
 
@@ -87,12 +72,8 @@ public class ReportGeneratorService {
                 .filter(r -> r.getManagerRating() != null)
                 .mapToInt(PerformanceReview::getManagerRating)
                 .average().stream().findFirst().orElse(0);
-
-        // ─── Attendance ───
         var summary = attendanceService.getMySummary(
                 employee.getEmail(), null, null);
-
-        // ─── Leaves ───
         List<LeaveApplication> leaves = leaveApplicationRepository
                 .findByEmployeeEmployeeId(employee.getEmployeeId()).stream()
                 .filter(l -> l.getStartDate().getYear() == currentYear)
@@ -104,8 +85,6 @@ public class ReportGeneratorService {
                 .collect(Collectors.groupingBy(
                         l -> l.getLeaveType().getLeaveTypeName(),
                         Collectors.summingInt(LeaveApplication::getTotalDays)));
-
-        // ─── Build Response ───
         PerformanceReportResponse response = PerformanceReportResponse.builder()
                 .employeeName(employee.getFirstName() + " " + employee.getLastName())
                 .employeeCode(employee.getEmployeeCode())
@@ -128,8 +107,6 @@ public class ReportGeneratorService {
                 .averageSelfRating(avgSelfRating)
                 .averageManagerRating(avgManagerRating)
                 .build();
-
-        // ─── AI-Generated Assessment ───
         generateAiAssessment(response, employee, reviews);
 
         return response;
@@ -137,7 +114,6 @@ public class ReportGeneratorService {
 
     private void generateAiAssessment(PerformanceReportResponse response, Employee employee,
                                        List<PerformanceReview> reviews) {
-        // Check Ollama availability first to avoid long timeouts
         if (!ollamaClient.isAvailable()) {
             log.info("Ollama not available — using data-driven assessment fallback");
             setDefaultAssessment(response);
@@ -164,19 +140,19 @@ public class ReportGeneratorService {
             String prompt = String.format("""
                     You are a senior HR analyst. Generate a professional performance assessment.
                     Keep each section to 2-4 sentences. Be specific and constructive.
-                    
+
                     Employee: %s (%s) | Department: %s | Designation: %s
-                    
+
                     ATTENDANCE: Present %d days | Absent %d days | Late %d times | Avg hours/day: %.1f
                     LEAVES: %d days taken (%s)
-                    
+
                     GOALS (%d total, %d completed, avg progress %s%%):
                     %s
-                    
+
                     PERFORMANCE REVIEWS:
                     %s
                     Avg Self Rating: %.1f | Avg Manager Rating: %.1f
-                    
+
                     Respond EXACTLY in this format:
                     OVERALL_ASSESSMENT: [2-3 sentence overall performance summary]
                     STRENGTHS: [Key strengths, 2-3 sentences]
@@ -212,13 +188,10 @@ public class ReportGeneratorService {
     }
 
     private void setDefaultAssessment(PerformanceReportResponse response) {
-        // Generate meaningful data-driven assessment even without Ollama
         StringBuilder overall = new StringBuilder();
         StringBuilder strengths = new StringBuilder();
         StringBuilder improvements = new StringBuilder();
         StringBuilder recommendations = new StringBuilder();
-
-        // ─── Overall Assessment ───
         overall.append(response.getEmployeeName()).append(" has been present for ")
                 .append(response.getTotalPresentDays()).append(" days with an average of ")
                 .append(response.getAverageHoursPerDay()).append(" hours per day. ");
@@ -240,8 +213,6 @@ public class ReportGeneratorService {
         } else if (response.getAverageManagerRating() > 0) {
             overall.append("Manager ratings suggest room for improvement.");
         }
-
-        // ─── Strengths ───
         if (response.getTotalPresentDays() > 0 && response.getLateArrivals() <= 2) {
             strengths.append("Demonstrates strong punctuality and attendance discipline. ");
         }
@@ -259,8 +230,6 @@ public class ReportGeneratorService {
         if (strengths.isEmpty()) {
             strengths.append("Employee shows consistency in their work routine and availability.");
         }
-
-        // ─── Areas for Improvement ───
         if (response.getLateArrivals() > 3) {
             improvements.append("Late arrivals (").append(response.getLateArrivals())
                     .append(" instances) should be reduced. ");
@@ -280,8 +249,6 @@ public class ReportGeneratorService {
         if (improvements.isEmpty()) {
             improvements.append("No major concerns identified. Continue maintaining current performance standards and explore leadership opportunities.");
         }
-
-        // ─── Recommendations ───
         if (response.getInProgressGoals() > 0) {
             recommendations.append("Focus on completing the ").append(response.getInProgressGoals())
                     .append(" in-progress goal(s) before their deadlines. ");
@@ -293,8 +260,6 @@ public class ReportGeneratorService {
             recommendations.append("Discuss time management strategies to improve punctuality. ");
         }
         recommendations.append("Schedule regular 1-on-1 check-ins to align on priorities and career growth.");
-
-        // ─── Rating ───
         String rating;
         double score = 0;
         if (response.getAverageManagerRating() > 0) score += response.getAverageManagerRating() * 0.4;

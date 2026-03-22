@@ -81,7 +81,6 @@ export class ActivityLogs implements OnInit {
         this.loading.set(false);
     }
 
-    
     onEntityTypeChange(event: Event): void {
         const val = (event.target as HTMLSelectElement).value;
         this.entityTypeFilter.set(val);

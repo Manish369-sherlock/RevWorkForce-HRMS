@@ -29,11 +29,7 @@ public interface LeaveApplicationRepository extends JpaRepository<LeaveApplicati
     long countByEmployee_EmployeeIdAndStatus(Integer employeeId, LeaveStatus status);
 
     Page<LeaveApplication> findByStatus(LeaveStatus status, Pageable pageable);
-
-    // List variant for AI analysis (no pagination needed)
     List<LeaveApplication> findByEmployeeEmployeeId(Integer employeeId);
-
-    // Efficient team-on-leave count for AI analysis (replaces findAll + stream filter)
     @Query("SELECT COUNT(DISTINCT la.employee.employeeId) FROM LeaveApplication la " +
            "WHERE la.employee.manager.employeeId = :managerId AND la.status = :status " +
            "AND la.startDate <= :date AND la.endDate >= :date")

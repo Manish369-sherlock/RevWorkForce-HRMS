@@ -156,7 +156,7 @@ export class AttendanceManagement implements OnInit {
                 const h12 = h % 12 || 12;
                 return `${h12}:${String(m).padStart(2, '0')} ${period}`;
             }
-            
+
             const date = new Date(datetime);
             if (isNaN(date.getTime())) return '—';
             return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });

@@ -15,17 +15,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Admin/Finance Expense endpoints.
- * Admin and Finance managers can view all expenses, approve at finance level, and mark as reimbursed.
- */
 @RestController
 @RequestMapping("/api/admin/expenses")
 public class AdminExpenseController {
 
     @Autowired private ExpenseService expenseService;
-
-    // Get all expenses (optionally filter by status)
     @GetMapping
     public ResponseEntity<Page<Expense>> getAllExpenses(
             @RequestParam(required = false) String status,
@@ -38,8 +32,6 @@ public class AdminExpenseController {
         return ResponseEntity.ok(expenseService.getAllExpenses(expenseStatus,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))));
     }
-
-    // Get expenses pending finance approval
     @GetMapping("/finance-pending")
     public ResponseEntity<Page<Expense>> getFinancePending(
             @RequestParam(defaultValue = "0") int page,
@@ -47,8 +39,6 @@ public class AdminExpenseController {
         return ResponseEntity.ok(expenseService.getFinancePendingExpenses(
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "managerActionDate"))));
     }
-
-    // Finance action (approve, reject, reimburse)
     @PatchMapping("/{id}/finance-action")
     public ResponseEntity<Expense> financeAction(
             Authentication auth,

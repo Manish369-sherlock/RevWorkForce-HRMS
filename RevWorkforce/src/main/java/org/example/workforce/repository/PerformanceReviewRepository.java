@@ -16,8 +16,6 @@ import java.util.Optional;
 public interface PerformanceReviewRepository extends JpaRepository<PerformanceReview, Integer> {
     Page<PerformanceReview> findByEmployee_EmployeeId(Integer employeeId, Pageable pageable);
     Page<PerformanceReview> findByEmployee_EmployeeIdAndStatus(Integer employeeId, ReviewStatus status, Pageable pageable);
-
-    // List variant for AI report generation
     List<PerformanceReview> findByEmployeeEmployeeId(Integer employeeId);
     Optional<PerformanceReview> findByEmployee_EmployeeIdAndReviewPeriod(Integer employeeId, String reviewPeriod);
     @Query("SELECT pr from PerformanceReview pr where pr.employee.manager.employeeCode = :managerCode AND pr.status = :status")

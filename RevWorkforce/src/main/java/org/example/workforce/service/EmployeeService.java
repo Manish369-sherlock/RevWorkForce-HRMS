@@ -84,8 +84,6 @@ public class EmployeeService {
             employee.setManager(manager);
         }
         Employee savedEmployee = employeeRepository.save(employee);
-
-        // Send welcome email with credentials
         try {
             emailService.sendWelcomeEmail(
                     savedEmployee.getEmail(),
@@ -95,7 +93,6 @@ public class EmployeeService {
                     savedEmployee.getRole().name()
             );
         } catch (Exception e) {
-            // Don't fail registration if email fails
         }
 
         return savedEmployee;

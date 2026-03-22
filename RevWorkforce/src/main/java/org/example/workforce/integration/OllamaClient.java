@@ -29,13 +29,9 @@ public class OllamaClient {
     private int timeout;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // ─── Availability cache (avoids 3s timeout on every request) ───
     private volatile Boolean cachedAvailable = null;
     private volatile long cachedAt = 0;
     private static final long CACHE_TTL_MS = 60_000; // 60 seconds
-
-    // ─── Cached RestTemplate (avoid re-creation on every call) ───
     private volatile RestTemplate cachedRestTemplate;
 
     private RestTemplate getRestTemplate() {
@@ -52,7 +48,6 @@ public class OllamaClient {
         return cachedRestTemplate;
     }
 
-    /** Check if Ollama is reachable (cached for 60 seconds) */
     public boolean isAvailable() {
         long now = System.currentTimeMillis();
         if (cachedAvailable != null && (now - cachedAt) < CACHE_TTL_MS) {
@@ -64,7 +59,6 @@ public class OllamaClient {
         return result;
     }
 
-    /** Force-refresh the availability cache */
     public void refreshAvailability() {
         cachedAvailable = null;
         cachedAt = 0;
@@ -86,20 +80,16 @@ public class OllamaClient {
         }
     }
 
-    /** Text-only generation (phi3) — optimized for speed */
     public String generate(String prompt) {
         return generate(prompt, 150);
     }
 
-    /** Text-only generation with configurable max tokens */
     public String generate(String prompt, int maxTokens) {
         String url = baseUrl + "/api/generate";
         Map<String, Object> body = new HashMap<>();
         body.put("model", model);
         body.put("prompt", prompt);
         body.put("stream", false);
-
-        // ── Speed optimizations ──
         Map<String, Object> options = new HashMap<>();
         options.put("num_predict", maxTokens);   // limit output tokens → faster
         options.put("temperature", 0);            // deterministic → no sampling overhead
@@ -130,10 +120,6 @@ public class OllamaClient {
         }
     }
 
-    /**
-     * Vision generation — sends an image (base64) with a prompt to a vision model (llava).
-     * Optimized with speed parameters.
-     */
     public String generateWithImage(String prompt, String base64Image) {
         String url = baseUrl + "/api/generate";
         Map<String, Object> body = new HashMap<>();
@@ -141,8 +127,6 @@ public class OllamaClient {
         body.put("prompt", prompt);
         body.put("images", List.of(base64Image));
         body.put("stream", false);
-
-        // ── Speed optimizations ──
         Map<String, Object> options = new HashMap<>();
         options.put("num_predict", 300);
         options.put("temperature", 0);

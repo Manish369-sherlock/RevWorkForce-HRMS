@@ -14,8 +14,6 @@ import java.util.List;
 public interface GoalRepository extends JpaRepository<Goal, Integer> {
     Page<Goal> findByEmployee_EmployeeId(Integer employeeId, Pageable pageable);
     Page<Goal> findByEmployee_EmployeeIdAndYear(Integer employeeId, Integer year, Pageable pageable);
-
-    // List variant for AI report generation (no pagination needed)
     List<Goal> findByEmployeeEmployeeIdAndYear(Integer employeeId, Integer year);
     Page<Goal> findByEmployee_EmployeeIdAndStatus(Integer employeeId, GoalStatus status, Pageable pageable);
     @Query("select g from Goal g where g.employee.employeeCode = :employeeCode and g.employee.manager.employeeCode = :managerCode")

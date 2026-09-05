@@ -1,6 +1,5 @@
 export const environment = {
-    production: true,
-    apiUrl: '/api',
-    wsUrl: '/ws'
+  production: true,
+  apiUrl: 'https://revworkforce-hrms-production.up.railway.app/api',
+  wsUrl: 'wss://revworkforce-hrms-production.up.railway.app/ws'
 };
-
